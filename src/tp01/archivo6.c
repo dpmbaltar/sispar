@@ -20,5 +20,7 @@ int main() {
 	for (int i = 0; i < 5; i++)
 		printf("p[%d] = %x\n", i, p[i]);
 
+	free(p);
+
 	return 0;
 }
