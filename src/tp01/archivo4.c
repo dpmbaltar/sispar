@@ -14,12 +14,9 @@ int main() {
 	printf("Tamaño de puntero: %li\n", sizeof(int*));
 	printf("Dirección del arreglo: %x\n", arr); // &arr[0]
 
-	for (int i = 0; i < ROWS; i++)
-		for (int j = 0; j < COLS; j++)
-			arr[i][j] = n++;
-
 	for (int i = 0; i < ROWS; i++) {
 		for (int j = 0; j < COLS; j++) {
+			arr[i][j] = n++;
 			printf("Elemento[%d][%d]: %d - Dirección: %x\n", i, j, arr[i][j], &arr[i][j]);
 		}
 	}
