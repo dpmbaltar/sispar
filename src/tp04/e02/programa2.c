@@ -24,6 +24,7 @@ void imprimirDatos() {
 int main(int argc, char *argv[])
 {
    int w, n, i, j, k, r, **a, **b, **c, **aux;
+   double t;
 
    if (argc != 2){
       printf("Argumento requerido: iteraciones\n");
@@ -44,10 +45,11 @@ int main(int argc, char *argv[])
 
    // Inicialización de matrices
    leerDatos();
-   double t;
-   t = sampleTime();
+
    // Kernel de la aplicación
    for (w = 0; w < n; w++) {
+      t = sampleTime();
+
       // A continuación se multiplican dos matrices de 1000x1000
       for(i = 0; i < X; ++i)
          for(k = 0; k < X; ++k) {
@@ -58,9 +60,11 @@ int main(int argc, char *argv[])
       aux = a;
       a = c;
       c = aux;
+
+      t = sampleTime() - t;
+      printf("%f\n", t);
    }
-   t = sampleTime() - t;
-   printf("%f\n", t);
+
    // Finalización
    imprimirDatos();
    return 0;

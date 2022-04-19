@@ -1,7 +1,13 @@
 #!/bin/bash
 
-ntimes="$(seq 1 10)"
+prog="./prog"
+outfile="./prog_out.txt"
+> $outfile
 
+ntimes="$(seq 10 10 30)"
 for n in $ntimes; do
-    ./prog $n >> prog_out.txt
+    echo "n = $n" | tee -a $outfile
+    >> $outfile
+    $prog $n | tee -a $outfile
+    >> $outfile
 done
