@@ -7,7 +7,6 @@ int main()
     int i, elementos = 1000000;
     int offset, iters;
     int *v;
-    int *a;
 
     __m256i v1, v2, v3;
     __m256i iaux1, iaux2, iaux3;
@@ -19,8 +18,6 @@ int main()
 
     if (posix_memalign((void**)&v, 32, elementos * sizeof(int)) != 0)
         return 1;
-    if (posix_memalign((void**)&a, 32, offset) != 0)
-        return 1;
 
     // no vectorizar este for
     for (i = 0; i < elementos; i++)
@@ -30,15 +27,12 @@ int main()
     printf("v[11]=%11d, ", v[11]);
     printf("v[elementos-1]=%11d\n", v[elementos-1]);
 
-    iaux2 = _mm256_set1_epi32(10);
     daux1 = _mm256_set1_epi32(2);
     daux2 = _mm256_set1_epi32(-2);
+    iaux2 = _mm256_set1_epi32(10);
+    iaux3 = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7); //i offsets
 
-    for (int k = 0; k < offset; k++)
-        a[k] = k;
-    iaux3 = _mm256_load_si256((__m256i const *)a); //i offsets
-
-   for (i = 0; i < iters; i++) {
+    for (i = 0; i < iters; i++) {
         v1 = _mm256_load_si256((__m256i const *)(v+(i*offset)));
 
         iaux1 = _mm256_set1_epi32(i*offset);
@@ -57,11 +51,11 @@ int main()
         v1 = _mm256_add_epi32(v2, v3);
 
         _mm256_store_si256((__m256i *)(v+(i*offset)), v1);
-   }
+    }
 
-   printf("v[0]=%11d, ", v[0]);
-   printf("v[11]=%11d, ", v[11]);
-   printf("v[elementos-1]=%11d\n", v[elementos-1]);
+    printf("v[0]=%11d, ", v[0]);
+    printf("v[11]=%11d, ", v[11]);
+    printf("v[elementos-1]=%11d\n", v[elementos-1]);
 
-   return 0;
+    return 0;
 }
