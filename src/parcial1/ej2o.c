@@ -7,7 +7,6 @@ int main()
     int i, elementos = 1000000;
     int offset, iters;
     int *v;
-    int v_offset;
 
     __m256i v1, v2, v3;
     __m256i aux1, aux2;
@@ -34,10 +33,8 @@ int main()
     iaux2 = _mm256_set1_epi32(80); //i*10 step
 
     for (i = 0; i < iters; i++) {
-        v_offset = i * offset;
-
         // cargar vector
-        v1 = _mm256_load_si256((__m256i const *)&v[v_offset]);
+        v1 = _mm256_load_si256((__m256i const *)v + i);
 
         // realizar comparación: v[i] < i*10
         cmp1 = _mm256_cmpgt_epi32(iaux1, v1);
@@ -49,7 +46,7 @@ int main()
         v1 = _mm256_mullo_epi32(v1, v2);
 
         // guardar resultado
-        _mm256_store_si256((__m256i *)&v[v_offset], v1);
+        _mm256_store_si256((__m256i *)v + i, v1);
 
         iaux1 = _mm256_add_epi32(iaux1, iaux2);
     }
