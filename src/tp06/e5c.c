@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <omp.h>
 
+
 double sample_time() {
    struct timespec tv;
    clock_gettime(CLOCK_MONOTONIC_RAW, &tv);
@@ -21,7 +22,7 @@ void main ()
     int thread_num_steps;
     int thread_num = 0;
     int nthreads = omp_get_max_threads();
-    double thread_sum[nthreads];
+    double thread_sum[nthreads][8];
 
     memset(thread_sum, 0, sizeof(double) * nthreads);
     omp_set_num_threads(nthreads);
@@ -29,7 +30,6 @@ void main ()
     thread_num_steps = num_steps / nthreads;
     step = 1.0/(double) num_steps;
     t = sample_time();
-    //printf("nthreads: %d\nthread_num_steps: %d\n\n", nthreads, thread_num_steps);
     #pragma omp parallel \
                 private(i, x, num_steps, step_init, thread_num) \
                 firstprivate(thread_num_steps)
@@ -37,16 +37,15 @@ void main ()
         thread_num = omp_get_thread_num();
         step_init = thread_num * thread_num_steps;
         num_steps = step_init + thread_num_steps;
-        //printf("thread_num: %d\n step_init: %d\n num_steps: %d\n", thread_num, step_init, num_steps);
         for (i = step_init; i < num_steps; i++) {
             x = (i + 0.5) * step;
-            thread_sum[thread_num] += 4.0 / (1.0 + x * x);
+            thread_sum[thread_num][0] += 4.0 / (1.0 + x * x);
         }
     }
-    t = sample_time() - t;
+    t = sample_time() -t;
 
     for (i = 0; i < nthreads; i++)
-        sum += thread_sum[i];
+        sum += thread_sum[i][0];
 
     pi = step * sum;
     printf("%f\n", pi);
