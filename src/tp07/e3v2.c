@@ -8,8 +8,8 @@ int main(int argc, char *argv[])
     int procesos;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int name_len;
-    int nGlobal = 40;
-    int i, n, exceso;
+    int nGlobal = 8;
+    int i, n, exceso, offset;
     int *datos;
 
     MPI_Init(&argc, &argv);
@@ -20,12 +20,15 @@ int main(int argc, char *argv[])
     n = nGlobal / procesos;
     exceso = nGlobal % procesos;
 
-    if (rank == procesos - 1)
-        n += exceso;
+    if (rank < exceso) {
+        n++;
+        offset = rank * n;
+    } else
+        offset = (rank * n) + exceso;
 
     datos = malloc(sizeof(int) * n);
     for (i = 0; i < n; i++)
-        datos[i] = i + rank * n;
+        datos[i] = i + offset;
 
     for (i = 0; i < n; i++)
         printf("%d: %d\n", rank, datos[i]);
