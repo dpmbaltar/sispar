@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
-#define N 3
+#define N 10
 
 int main(int argc, char **argv)
 {
     int size, rank;
-    int i, j;
+    int i, j = 1;
     double t;
     enum rank_roles {SENDER, RECEIVER};
 
@@ -21,33 +21,31 @@ int main(int argc, char **argv)
 
     t = MPI_Wtime();
 
-    // Probar tipo
     switch (rank)
     {
         case SENDER:
         {
-            /*int **matrix = (int**)malloc(sizeof(int*) * N);
-            for (i = 0; i < N; i++) {
-                matrix[i] = (int*)malloc(sizeof(int) * N);
-                for (j = 0; j < N; j++)
-                    matrix[i][j] = (N*i) + j;
-            }*/
-            int matrix[3][3] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+            // Crear matriz de N*N como arreglo;
+            // no se usa pila para evitar overflow con N muy grande
+            int *matrix = (int*)malloc(sizeof(int) * N * N);
+            for (i = 0; i < N * N; i++)
+                matrix[i] = i;
 
-            // Crear tipo "mcol" (matrix column) para matriz de N*N
-            MPI_Datatype mcol;
-            MPI_Type_vector(N, N, N+1, MPI_INT, &mcol);
-            MPI_Type_commit(&mcol);
+            // Crear tipo "mcol_type" (matrix column type) para matriz de N*N
+            MPI_Datatype mcol_type;
+            MPI_Type_vector(N, 1, N, MPI_INT, &mcol_type);
+            MPI_Type_commit(&mcol_type);
 
-            // Enviar la columna 1
-            MPI_Send(&matrix[0][1], 1, mcol, RECEIVER, 0, MPI_COMM_WORLD);
+            // Enviar la columna j
+            MPI_Send(&matrix[j], 1, mcol_type, RECEIVER, 0, MPI_COMM_WORLD);
         }
         break;
         case RECEIVER:
         {
             int *col = (int*)malloc(sizeof(int) * N);
-            MPI_Recv(&col, N, MPI_INT, SENDER, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
+            MPI_Recv(col, N, MPI_INT, SENDER, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            
+            printf("Valores de la columna %d:\n", j);
             for (i = 0; i < N; i++)
                 printf("%d\n", col[i]);
         }
