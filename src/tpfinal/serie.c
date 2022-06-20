@@ -84,10 +84,12 @@ int main(int argc, char *argv[])
     char **aux;
     char **nextStep; //Representa el estado siguiente del mundo
     nextStep = malloc(nrows * sizeof (char*));
-    aux = malloc(nrows * sizeof (char*));
+    //aux = malloc(nrows * sizeof (char*)); // No es necesario?
 
+    //Reserva memoria dinámica para el siguiente estado de mundo
     for (i = 0; i < nrows; i++)
         nextStep[i] = (char *) malloc((cols + 2) * sizeof (char));
+
     int c;
     int cant1;
     for (c = 0; c < steps; c++) {
@@ -123,7 +125,7 @@ int main(int argc, char *argv[])
         nextStep[nrows - 1][ncols - 1] = nextStep[1][1];
 
         //Intercambio de punteros, para realizar el siguiente paso con los nuevos
-        estados calculados
+        //estados calculados
         aux = old;
         old = nextStep;
         nextStep = aux;
