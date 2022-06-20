@@ -85,13 +85,13 @@ int main(int argc, char **argv)
     chunk_remains[ROWS] = rows % dims[ROWS];
     chunk_remains[COLS] = cols % dims[COLS];
 
-    //Asignar resto a última fila y columna
-    if (coords[0] == (dims[0]-1) && chunk_remains[ROWS] != 0)
-            chunk_lengths[ROWS] += chunk_remains[ROWS];
-    if (coords[1] == (dims[1]-1) && chunk_remains[COLS] != 0)
-        chunk_lengths[COLS] += chunk_remains[COLS];
+    //Repartir resto a los primeros procesos de la topología
+    if (coords[0] < chunk_remains[ROWS])
+        chunk_lengths[ROWS]++;
+    if (coords[1] < chunk_remains[COLS])
+        chunk_lengths[COLS]++;
 
-    //Crear tipo de datos para la porción de datos
+    //Crear tipo de datos para la porción de datos del proceso
     MPI_Datatype chunk_col_type;
     MPI_Type_vector(cols, chunk_lengths[COLS], cols, MPI_CHAR, &chunk_col_type);
     MPI_Type_commit(&chunk_col_type);
