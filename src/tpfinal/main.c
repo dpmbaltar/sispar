@@ -10,6 +10,18 @@ int main(int argc, char **argv)
     char *s, *res;
     int rows, cols, steps, n, i, j, ncols, nrows;
 
+    int size, rank;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    //Permitir solo cantidad de procesos pares
+    if (size < 2 || (size % 2) != 0) {
+        printf("Error: debe ejecutarse con un número par de procesos\n");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+
     //Controla que se haya ingresado un argumento en la llamada (el archivo con
     //el patrón de entrada)
     if (argc != 2) {
@@ -37,18 +49,48 @@ int main(int argc, char **argv)
     ncols = cols + 2;
     printf("Rows: %d cols: %d\n", rows, cols);
 
-    //MPI----------------------------------------------------------------------
-    int size;
+    //Se reserva memoria dinámica para la matriz de celdas, representada por el
+    //arreglo de punteros "old"
+    //char **old;
+    //old = malloc(rows * sizeof (char*));
+    char *old;
+    old = malloc(rows * cols * sizeof (char*));
+    memset(old, 0, rows * cols * sizeof (char*));
+    /*for (i = 0; i < rows; i++) {
+        old[i] = (char *) malloc((cols) * sizeof (char));
+    }*/
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    //Inicializa elementos de la matriz "old" con 0 o 1 segun el patron de entrada
+    i = 0;
+    s = malloc(cols + 2);
+    res = fgets(s, cols + 2, f);
 
-    //Permitir solo cantidad de procesos pares
-    if (size < 2 || (size % 2) != 0) {
-        printf("Error: debe ejecutarse con un número par de procesos\n");
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    while (i < rows && res != NULL) {
+        for (j = 0; j < strlen(s) - 1; j++)
+            old[i*cols+j] = (s[j] == '.') ? 0 : 1;
+        for (j = strlen(s) - 1; j < cols+2; j++)
+            old[i*cols+j] = 0;
+        res = fgets(s, cols + 2, f);
+        i++;
+    };
+
+    //Para las últimas filas si no están "dibujadas" en el patrón
+    for (j = i; j < rows; j++)
+        memset(&old[j], 0, cols+2);
+
+    fclose(f); //Se cierra el archivo
+    free(s); //Se libera la memoria utilizada para recorrer el archivo
+
+    if (rank == 0) { //rank0
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < cols; j++) {
+            printf("%c", old[i*cols+j] == 1 ? 'O' : '.');
+        }
+        printf("\n");
     }
+    } //rank0
 
+    //MPI----------------------------------------------------------------------
     //Crear topología cartesiana de 2 dimensiones
     int dims[2] = {0, 0};
     int periods[2] = {true, true};
@@ -60,7 +102,6 @@ int main(int argc, char **argv)
     printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
 
     //Obtener datos del proceso
-    int rank;
     int coords[2];
     int next_ranks[4];
     char* next_names[4] = {"up", "down", "left", "right"};
@@ -76,7 +117,7 @@ int main(int argc, char **argv)
         printf(" %s: %d;", next_names[i], next_ranks[i]);
     printf("\n");
 
-    //Repartir datos
+    //Repartir datos a los procesos
     int chunk_lengths[2];
     int chunk_remains[2];
     enum DIMENSIONS {ROWS, COLS};
