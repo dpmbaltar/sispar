@@ -139,6 +139,28 @@ int main(int argc, char **argv)
 
     printf("[MPI process %d] Chunk col length: (%d, %d).\n", rank, chunk_lengths[ROWS], chunk_lengths[COLS]);
 
+    if (rank == 0 /*&& coords[0] == 0*/) {
+        MPI_Status send_st;
+        MPI_Request send_req;
+
+        MPI_Isend(old, 1, chunk_col_type, 1, 0, new_comm, &send_req);
+        MPI_Wait(&send_req, &send_st);
+    }
+
+    if (rank == 1) {
+        MPI_Status recv_st;
+        MPI_Request recv_req;
+        char buf[50];
+        memset(buf, '\0', 50);
+
+        MPI_Irecv(buf, 20, MPI_CHAR, 0, 0, new_comm, &recv_req);
+        MPI_Wait(&recv_req, &recv_st);
+
+        for (i=0;i<cols;i++)
+            printf("%c", buf[i] == 0? '.' : 'O');
+        printf("\n");
+    }
+
     MPI_Finalize();
 
     return EXIT_SUCCESS;
