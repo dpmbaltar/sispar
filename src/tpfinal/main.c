@@ -108,9 +108,9 @@ int main(int argc, char **argv)
         printf(" %s: %d;", next_names[i], next_ranks[i]);
     printf("\n");
 
-    //Repartir datos a los procesos
-    int chunk_lengths[2];
-    int chunk_remains[2];
+    //Establecer datos del proceso
+    int chunk_lengths[2]; //(cantidad de filas, cantidad de columnas)
+    int chunk_remains[2]; //(resto de filas, resto de columnas)
     enum DIMENSIONS {ROWS, COLS};
     chunk_lengths[ROWS] = rows / dims[ROWS];
     chunk_lengths[COLS] = cols / dims[COLS];
@@ -123,45 +123,74 @@ int main(int argc, char **argv)
     if (coords[1] < chunk_remains[COLS])
         chunk_lengths[COLS]++;
 
-    //Crear tipo de datos para la porción de datos del proceso
-    MPI_Datatype chunk_col_type;
-    MPI_Type_vector(chunk_lengths[ROWS], chunk_lengths[COLS], cols, MPI_CHAR, &chunk_col_type);
-    MPI_Type_commit(&chunk_col_type);
-
     printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_lengths[ROWS], chunk_lengths[COLS]);
 
     if (rank == 0) {
+        int proc_rows = rows / dims[ROWS];
+        int proc_cols = cols / dims[COLS];
+        int proc_rows_rem = rows % dims[ROWS];
+        int proc_cols_rem = cols % dims[COLS];
         MPI_Status send_st;
         MPI_Request send_req;
 
+        //Crear tipo de datos para la porción de datos del proceso:
+        //Si la cantidad de datos por proceso no es igual para todos los procesos
+        //entonces se necesitan 2 o 4 tipos derivados distintos
+        MPI_Datatype chunk_type[4];
+        MPI_Type_vector(proc_rows, proc_cols, cols, MPI_CHAR, &chunk_type[0]);
+        MPI_Type_commit(&chunk_type[0]);
+
+        if (proc_rows_rem > 0) {
+            MPI_Type_vector(proc_rows+1, proc_cols, cols, MPI_CHAR, &chunk_type[1]);
+            MPI_Type_commit(&chunk_type[1]);
+        }
+        if (proc_cols_rem > 0) {
+            MPI_Type_vector(proc_rows, proc_cols+1, cols, MPI_CHAR, &chunk_type[2]);
+            MPI_Type_commit(&chunk_type[2]);
+        }
+        if (proc_rows_rem > 0 && proc_cols_rem > 0) {
+            MPI_Type_vector(proc_rows+1, proc_cols+1, cols, MPI_CHAR, &chunk_type[3]);
+            MPI_Type_commit(&chunk_type[3]);
+        }
+
+        //Mostrar datos cargados
         for (i = 0; i < rows; i++) {
             for (j = 0; j < cols; j++) {
                 printf("%c", old[i*cols+j] == 1 ? 'O' : '.');
             }
             printf("\n");
         }
-
-        MPI_Isend(old, 1, chunk_col_type, 1, 0, new_comm, &send_req);
-        MPI_Wait(&send_req, &send_st);
+        
+        //FALTA:
+        //- Enviar correctamente los datos a todos los procesos
+        //- Procesador los steps en cada proceso
+        //- Comunicar los cambios entre procesos
+        MPI_Isend(&old[5], 1, chunk_type[3], 1, 0, new_comm, &send_req);
+        MPI_Isend(&old[10], 1, chunk_type[3], 2, 0, new_comm, &send_req);
+        MPI_Isend(&old[15], 1, chunk_type[1], 3, 0, new_comm, &send_req);
+        //MPI_Wait(&send_req, &send_st);
     }
 
-    if (rank == 1) {
+    //Recibir datos
+    if (rank > 0 && rank < 4) { //if (rank > 0) {
         MPI_Status recv_st;
         MPI_Request recv_req;
-        int elems = chunk_lengths[ROWS]*chunk_lengths[COLS];
-        char buf[elems];
-        memset(buf, '\0', elems);
+        int ncells = chunk_lengths[ROWS] * chunk_lengths[COLS];
+        char buf[ncells];
+        memset(buf, '\0', ncells);
 
-        MPI_Recv(buf, 20, MPI_CHAR, 0, 0, new_comm, &recv_st);
-        //MPI_Wait(&recv_req, &recv_st);
+        MPI_Irecv(buf, ncells, MPI_CHAR, 0, 0, new_comm, &recv_req);
+        MPI_Wait(&recv_req, &recv_st);
 
-        for (i=0; i<chunk_lengths[ROWS]; i++) {
-            for (j=0; j<chunk_lengths[COLS]; j++)
+        for (i = 0; i < chunk_lengths[ROWS]; i++) {
+            for (j = 0; j < chunk_lengths[COLS]; j++)
                 printf("%c", buf[i*chunk_lengths[COLS]+j] == 0 ? '.' : 'O');
             printf("\n");
         }
         printf("\n");
     }
+
+
 
     MPI_Finalize();
 
