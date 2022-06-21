@@ -54,15 +54,15 @@ int main(int argc, char **argv)
     //char **old;
     //old = malloc(rows * sizeof (char*));
     char *old;
-    old = malloc(rows * cols * sizeof (char*));
-    memset(old, 0, rows * cols * sizeof (char*));
+    old = (char *)malloc(rows * cols * sizeof (char));
+    memset(old, 0, rows * cols * sizeof (char));
     /*for (i = 0; i < rows; i++) {
         old[i] = (char *) malloc((cols) * sizeof (char));
     }*/
-
+    
     //Inicializa elementos de la matriz "old" con 0 o 1 segun el patron de entrada
     i = 0;
-    s = malloc(cols + 2);
+    s = (char *)malloc(cols + 2);
     res = fgets(s, cols + 2, f);
 
     while (i < rows && res != NULL) {
@@ -80,15 +80,6 @@ int main(int argc, char **argv)
 
     fclose(f); //Se cierra el archivo
     free(s); //Se libera la memoria utilizada para recorrer el archivo
-
-    if (rank == 0) { //rank0
-    for (i = 0; i < rows; i++) {
-        for (j = 0; j < cols; j++) {
-            printf("%c", old[i*cols+j] == 1 ? 'O' : '.');
-        }
-        printf("\n");
-    }
-    } //rank0
 
     //MPI----------------------------------------------------------------------
     //Crear topología cartesiana de 2 dimensiones
@@ -134,14 +125,21 @@ int main(int argc, char **argv)
 
     //Crear tipo de datos para la porción de datos del proceso
     MPI_Datatype chunk_col_type;
-    MPI_Type_vector(cols, chunk_lengths[COLS], cols, MPI_CHAR, &chunk_col_type);
+    MPI_Type_vector(chunk_lengths[ROWS], chunk_lengths[COLS], cols, MPI_CHAR, &chunk_col_type);
     MPI_Type_commit(&chunk_col_type);
 
-    printf("[MPI process %d] Chunk col length: (%d, %d).\n", rank, chunk_lengths[ROWS], chunk_lengths[COLS]);
+    printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_lengths[ROWS], chunk_lengths[COLS]);
 
-    if (rank == 0 /*&& coords[0] == 0*/) {
+    if (rank == 0) {
         MPI_Status send_st;
         MPI_Request send_req;
+
+        for (i = 0; i < rows; i++) {
+            for (j = 0; j < cols; j++) {
+                printf("%c", old[i*cols+j] == 1 ? 'O' : '.');
+            }
+            printf("\n");
+        }
 
         MPI_Isend(old, 1, chunk_col_type, 1, 0, new_comm, &send_req);
         MPI_Wait(&send_req, &send_st);
@@ -150,14 +148,18 @@ int main(int argc, char **argv)
     if (rank == 1) {
         MPI_Status recv_st;
         MPI_Request recv_req;
-        char buf[50];
-        memset(buf, '\0', 50);
+        int elems = chunk_lengths[ROWS]*chunk_lengths[COLS];
+        char buf[elems];
+        memset(buf, '\0', elems);
 
-        MPI_Irecv(buf, 20, MPI_CHAR, 0, 0, new_comm, &recv_req);
-        MPI_Wait(&recv_req, &recv_st);
+        MPI_Recv(buf, 20, MPI_CHAR, 0, 0, new_comm, &recv_st);
+        //MPI_Wait(&recv_req, &recv_st);
 
-        for (i=0;i<cols;i++)
-            printf("%c", buf[i] == 0? '.' : 'O');
+        for (i=0; i<chunk_lengths[ROWS]; i++) {
+            for (j=0; j<chunk_lengths[COLS]; j++)
+                printf("%c", buf[i*chunk_lengths[COLS]+j] == 0 ? '.' : 'O');
+            printf("\n");
+        }
         printf("\n");
     }
 
