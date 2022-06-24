@@ -98,18 +98,26 @@ int main(int argc, char **argv)
     printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
 
     //Obtener datos del proceso
-    int coords[N_DIMS];
-    int next_ranks[4];
-    char* next_names[4] = {"up", "down", "left", "right"};
-    enum Direction {UP, DOWN, LEFT, RIGHT};
+    int coords[2];
+    int next_ranks[8];
+    char* next_names[8] = {"top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right"};
+    enum Direction {TOP, BOTTOM, LEFT, RIGHT, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT};
 
     MPI_Comm_rank(new_comm, &rank);
-    MPI_Cart_coords(new_comm, rank, N_DIMS, coords);
-    MPI_Cart_shift(new_comm, 0, 1, &next_ranks[UP], &next_ranks[DOWN]);
+    MPI_Cart_coords(new_comm, rank, 2, coords);
+    MPI_Cart_shift(new_comm, 0, 1, &next_ranks[TOP], &next_ranks[BOTTOM]);
     MPI_Cart_shift(new_comm, 1, 1, &next_ranks[LEFT], &next_ranks[RIGHT]);
+
+    int corner_coords[4][2] = {{-1,-1},{-1,1},{1,-1},{1,1}};
+    for (i = 0; i < 4; i++) {
+        corner_coords[i][0]+=coords[0];
+        corner_coords[i][1]+=coords[1];
+        MPI_Cart_rank(new_comm, corner_coords[i], &next_ranks[TOP_LEFT+i]);
+    }
+
     printf("[MPI process %d] Coords: (%d, %d).\n", rank, coords[0], coords[1]);
     printf("[MPI process %d] Neighbours:", rank);
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 8; i++)
         printf(" %s: %d;", next_names[i], next_ranks[i]);
     printf("\n");
 
@@ -259,49 +267,58 @@ int main(int argc, char **argv)
     }
 
     /* Computar estados del mundo */
-    int current_step;
-    int live_neighbours;
+    /*int current_step;
+    int live_neighbors;
     char (*aux_buffer)[chunk_cols];
+    char (*outer_rows)[chunk_cols];
+    char (*outer_cols)[2];
+    memset(outer_rows, 0, sizeof(sizeof(char[2][chunk_cols])));
+    memset(outer_cols, 0, sizeof(sizeof(char[chunk_rows][2])));
+
     MPI_Status status;
     MPI_Request request;
+    MPI_Status recv_status;
+    MPI_Request recv_request;
 
-    //Tipo derivado de columna de la partición de datos
+    //Tipo derivado para columna de la partición de datos
     MPI_Datatype chunk_col_type;
     MPI_Type_vector(chunk_rows, 1, cols, MPI_CHAR, &chunk_col_type);
     MPI_Type_commit(&chunk_col_type);
 
-    for (current_step = 0; c < steps; current_step++) {
+    for (current_step = 0; current_step < steps; current_step++) {
 
         //Enviar datos a los procesos vecinos
-        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[UP], 0, new_comm, &request);
-        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[DOWN], 0, new_comm, &request);
+        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &request);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &request);
         MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &request);
         MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_com, &request);
+
+        MPI_Irecv(buf, chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request);
 
         //Calcular los estados internos
         for (i = 1; i < chunk_rows-1; i++) {
             for (j = 1; j < chunk_cols-1; j++) {
                 //Suma las celdas vecinas para saber cuantas están vivas
-                live_neighbours = old_buffer[i - 1][j - 1];
-                live_neighbours+= old_buffer[i - 1][j];
-                live_neighbours+= old_buffer[i - 1][j + 1];
-                live_neighbours+= old_buffer[i][j - 1];
-                live_neighbours+= old_buffer[i][j + 1];
-                live_neighbours+= old_buffer[i + 1][j - 1];
-                live_neighbours+= old_buffer[i + 1][j];
-                live_neighbours+= old_buffer[i + 1][j + 1];
+                live_neighbors = old_buffer[i-1][j-1];
+                live_neighbors+= old_buffer[i-1][j];
+                live_neighbors+= old_buffer[i-1][j+1];
+                live_neighbors+= old_buffer[i][j-1];
+                live_neighbors+= old_buffer[i][j+1];
+                live_neighbors+= old_buffer[i+1][j-1];
+                live_neighbors+= old_buffer[i+1][j];
+                live_neighbors+= old_buffer[i+1][j+1];
 
                 if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
-                    new_buffer[i][j] = ((live_neighbours == 2 || live_neighbours == 3)) ? 1 : 0;
+                    new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
-                    new_buffer[i][j] = (live_neighbours == 3) ? 1 : 0;
+                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;
             }
         }
 
         //Recibir cambios de los vecinos y procesarlos bordes
 
         //Enviar cambios a los vecinos
-    }
+    }*/
 
     MPI_Finalize();
 
