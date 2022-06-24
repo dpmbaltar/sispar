@@ -10,7 +10,7 @@ int main(int argc, char **argv)
     char *s, *res;
     int rows, cols, steps, n, i, j, ncols, nrows;
 
-    int size, rank;
+    int size, rank, root = 0;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -53,12 +53,14 @@ int main(int argc, char **argv)
     //arreglo de punteros "old"
     //char **old;
     //old = malloc(rows * sizeof (char*));
-    char *old;
-    old = (char *)malloc(rows * cols * sizeof (char));
-    memset(old, 0, rows * cols * sizeof (char));
     /*for (i = 0; i < rows; i++) {
         old[i] = (char *) malloc((cols) * sizeof (char));
     }*/
+    //char *old;
+    //old = (char *)malloc(rows * cols * sizeof (char));
+    //memset(old, 0, rows * cols * sizeof (char));
+    char(*old)[cols] = malloc (sizeof(char[rows][cols]));
+    memset(old, 0, sizeof(char[rows][cols]));
     
     //Inicializa elementos de la matriz "old" con 0 o 1 segun el patron de entrada
     i = 0;
@@ -67,9 +69,11 @@ int main(int argc, char **argv)
 
     while (i < rows && res != NULL) {
         for (j = 0; j < strlen(s) - 1; j++)
-            old[i*cols+j] = (s[j] == '.') ? 0 : 1;
+            //old[i*cols+j] = (s[j] == '.') ? 0 : 1;
+            old[i][j] = (s[j] == '.') ? 0 : 1;
         for (j = strlen(s) - 1; j < cols+2; j++)
-            old[i*cols+j] = 0;
+            //old[i*cols+j] = 0;
+            old[i][j] = 0;
         res = fgets(s, cols + 2, f);
         i++;
     };
@@ -83,23 +87,24 @@ int main(int argc, char **argv)
 
     //MPI----------------------------------------------------------------------
     //Crear topología cartesiana de 2 dimensiones
-    int dims[2] = {0, 0};
-    int periods[2] = {true, true};
+    enum CartDimension {ROWS, COLS, N_DIMS};
+    int dims[N_DIMS] = {0, 0};
+    int periods[N_DIMS] = {true, true};
     int reorder = false;
     MPI_Comm new_comm;
 
-    MPI_Dims_create(size, 2, dims);
-    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &new_comm);
+    MPI_Dims_create(size, N_DIMS, dims);
+    MPI_Cart_create(MPI_COMM_WORLD, N_DIMS, dims, periods, reorder, &new_comm);
     printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
 
     //Obtener datos del proceso
-    int coords[2];
+    int coords[N_DIMS];
     int next_ranks[4];
     char* next_names[4] = {"up", "down", "left", "right"};
-    enum DIRECTIONS {UP, DOWN, LEFT, RIGHT};
+    enum Direction {UP, DOWN, LEFT, RIGHT};
 
     MPI_Comm_rank(new_comm, &rank);
-    MPI_Cart_coords(new_comm, rank, 2, coords);
+    MPI_Cart_coords(new_comm, rank, N_DIMS, coords);
     MPI_Cart_shift(new_comm, 0, 1, &next_ranks[UP], &next_ranks[DOWN]);
     MPI_Cart_shift(new_comm, 1, 1, &next_ranks[LEFT], &next_ranks[RIGHT]);
     printf("[MPI process %d] Coords: (%d, %d).\n", rank, coords[0], coords[1]);
@@ -109,74 +114,131 @@ int main(int argc, char **argv)
     printf("\n");
 
     //Establecer datos del proceso
-    int chunk_lengths[2]; //(cantidad de filas, cantidad de columnas)
-    int chunk_remains[2]; //(resto de filas, resto de columnas)
-    enum DIMENSIONS {ROWS, COLS};
-    chunk_lengths[ROWS] = rows / dims[ROWS];
-    chunk_lengths[COLS] = cols / dims[COLS];
-    chunk_remains[ROWS] = rows % dims[ROWS];
-    chunk_remains[COLS] = cols % dims[COLS];
+    //int chunk_lengths[N_DIMS]; //(cantidad de filas, cantidad de columnas)
+    //int chunk_remains[N_DIMS]; //(resto de filas, resto de columnas)
+    //chunk_lengths[ROWS] = rows / dims[ROWS];
+    //chunk_lengths[COLS] = cols / dims[COLS];
+    int chunk_rows = rows / dims[ROWS];
+    int chunk_cols = cols / dims[COLS];
+    int chunk_length = chunk_rows * chunk_cols;
+    char(*old_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
+    char(*new_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
+    memset(old_buffer, 0, sizeof(sizeof(char[chunk_rows][chunk_cols])));
+    memset(new_buffer, 0, sizeof(sizeof(char[chunk_rows][chunk_cols])));
 
+    //chunk_remains[ROWS] = rows % dims[ROWS];
+    //chunk_remains[COLS] = cols % dims[COLS];
     //Repartir resto a los primeros procesos de la topología
-    if (coords[0] < chunk_remains[ROWS])
+    /*if (coords[0] < chunk_remains[ROWS])
         chunk_lengths[ROWS]++;
     if (coords[1] < chunk_remains[COLS])
-        chunk_lengths[COLS]++;
+        chunk_lengths[COLS]++;*/
 
-    printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_lengths[ROWS], chunk_lengths[COLS]);
+    printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_rows, chunk_cols);
 
-    if (rank == 0) {
-        int proc_rows = rows / dims[ROWS];
+    MPI_Datatype chunk_type;
+    MPI_Type_vector(chunk_rows, chunk_cols, cols, MPI_CHAR, &chunk_type);
+    MPI_Type_commit(&chunk_type);
+
+    if (rank == root) {
+        /*int proc_rows = rows / dims[ROWS];
         int proc_cols = cols / dims[COLS];
-        int proc_rows_rem = rows % dims[ROWS];
+        /int proc_rows_rem = rows % dims[ROWS];
         int proc_cols_rem = cols % dims[COLS];
         MPI_Status send_st;
         MPI_Request send_req;
 
         //Crear tipo de datos para la porción de datos del proceso:
         //Si la cantidad de datos por proceso no es igual para todos los procesos
-        //entonces se necesitan 2 o 4 tipos derivados distintos
-        MPI_Datatype chunk_type[4];
-        MPI_Type_vector(proc_rows, proc_cols, cols, MPI_CHAR, &chunk_type[0]);
-        MPI_Type_commit(&chunk_type[0]);
+        //entonces se necesitan 2 o 4 tipos derivados distintos:
+        // TL | TR
+        // ---+---
+        // BL | BR
+        enum ChunkType {BR, BL, TR, TL, N_TYPES};
+        MPI_Datatype chunk_type[N_TYPES];
+        MPI_Type_vector(proc_rows, proc_cols, cols, MPI_CHAR, &chunk_type[BR]);
+        MPI_Type_commit(&chunk_type[BR]);
 
         if (proc_rows_rem > 0) {
-            MPI_Type_vector(proc_rows+1, proc_cols, cols, MPI_CHAR, &chunk_type[1]);
-            MPI_Type_commit(&chunk_type[1]);
+            MPI_Type_vector(proc_rows+1, proc_cols, cols, MPI_CHAR, &chunk_type[BL]);
+            MPI_Type_commit(&chunk_type[BL]);
         }
         if (proc_cols_rem > 0) {
-            MPI_Type_vector(proc_rows, proc_cols+1, cols, MPI_CHAR, &chunk_type[2]);
-            MPI_Type_commit(&chunk_type[2]);
+            MPI_Type_vector(proc_rows, proc_cols+1, cols, MPI_CHAR, &chunk_type[TR]);
+            MPI_Type_commit(&chunk_type[TR]);
         }
         if (proc_rows_rem > 0 && proc_cols_rem > 0) {
-            MPI_Type_vector(proc_rows+1, proc_cols+1, cols, MPI_CHAR, &chunk_type[3]);
-            MPI_Type_commit(&chunk_type[3]);
+            MPI_Type_vector(proc_rows+1, proc_cols+1, cols, MPI_CHAR, &chunk_type[TL]);
+            MPI_Type_commit(&chunk_type[TL]);
         }
 
-        //Mostrar datos cargados
-        for (i = 0; i < rows; i++) {
-            for (j = 0; j < cols; j++) {
-                printf("%c", old[i*cols+j] == 1 ? 'O' : '.');
+        int group_sizes[4] = {0,0,0,0};
+        int group_ranks[4][size];
+        MPI_Group world_group;
+        MPI_Group chunk_type_group[4];
+        MPI_Comm chunk_type_comm[4];
+        MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+        for (i = 0; i < dims[ROWS]; i++) {
+            for (j = 0; i < dims[COLS]; i++) {
+                if (i < proc_rows_rem && j < proc_cols_rem)
+                    group_sizes[TL]++;
+                    group_ranks[group_sizes[TL]] =
             }
-            printf("\n");
-        }
+        }*/
         
         //FALTA:
         //- Enviar correctamente los datos a todos los procesos
         //- Procesador los steps en cada proceso
         //- Comunicar los cambios entre procesos
-        MPI_Isend(&old[5], 1, chunk_type[3], 1, 0, new_comm, &send_req);
-        MPI_Isend(&old[10], 1, chunk_type[3], 2, 0, new_comm, &send_req);
-        MPI_Isend(&old[15], 1, chunk_type[1], 3, 0, new_comm, &send_req);
+        //MPI_Isend(&old[0][5], 1, chunk_type[TL], 1, 0, new_comm, &send_req);
+        //MPI_Isend(&old[0][10], 1, chunk_type[TL], 2, 0, new_comm, &send_req);
+        //MPI_Isend(&old[0][15], 1, chunk_type[TR], 3, 0, new_comm, &send_req);
         //MPI_Wait(&send_req, &send_st);
+
+        //Mostrar datos cargados
+        for (i = 0; i < rows; i++) {
+            for (j = 0; j < cols; j++) {
+                printf("%c", old[i][j] == 1 ? 'O' : '.');
+            }
+            printf("\n");
+        }
+
+        int pos = 0;
+        MPI_Pack(old, 1, chunk_type, old_buffer, chunk_length, &pos, new_comm);
+
+        MPI_Status status;
+        MPI_Request request;
+
+        for (i = 1; i < size; i++) {
+            int pcoords[2] = {0,0};
+            MPI_Cart_coords(new_comm, i, N_DIMS, pcoords);
+            int offset_rows = pcoords[0] * chunk_rows;
+            int offset_cols = pcoords[1] * chunk_cols;
+            MPI_Isend(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &request);
+        }
+
+        /*MPI_Scatter(old, 1, chunk_type,
+                    old_buffer, chunk_length, MPI_CHAR,
+                    root, new_comm);*/
+    } else {
+        /*MPI_Scatter(NULL, 1, chunk_type,
+                    old_buffer, chunk_length, MPI_CHAR,
+                    root, new_comm);*/
+        MPI_Status status;
+        MPI_Request request;
+
+        MPI_Irecv(old_buffer, chunk_length, MPI_CHAR, root, 0, new_comm, &request);
+        MPI_Wait(&request, &status);
+
     }
 
     //Recibir datos
-    if (rank > 0 && rank < 4) { //if (rank > 0) {
+    /*if (rank > 0 && rank < 4) { //if (rank > 0) {
         MPI_Status recv_st;
         MPI_Request recv_req;
         int ncells = chunk_lengths[ROWS] * chunk_lengths[COLS];
-        char buf[ncells];
+        char buf[chunk_lengths[ROWS]][chunk_lengths[COLS]];
         memset(buf, '\0', ncells);
 
         MPI_Irecv(buf, ncells, MPI_CHAR, 0, 0, new_comm, &recv_req);
@@ -184,13 +246,62 @@ int main(int argc, char **argv)
 
         for (i = 0; i < chunk_lengths[ROWS]; i++) {
             for (j = 0; j < chunk_lengths[COLS]; j++)
-                printf("%c", buf[i*chunk_lengths[COLS]+j] == 0 ? '.' : 'O');
+                printf("%c", buf[i][j] == 0 ? '.' : 'O');
             printf("\n");
         }
         printf("\n");
+    }*/
+
+    for (i = 0; i < chunk_rows; i++) {
+        for (j = 0; j < chunk_cols; j++)
+            printf("%c", old_buffer[i][j] == 0 ? '.' : 'O');
+        printf("\n");
     }
 
+    /* Computar estados del mundo */
+    int current_step;
+    int live_neighbours;
+    char (*aux_buffer)[chunk_cols];
+    MPI_Status status;
+    MPI_Request request;
 
+    //Tipo derivado de columna de la partición de datos
+    MPI_Datatype chunk_col_type;
+    MPI_Type_vector(chunk_rows, 1, cols, MPI_CHAR, &chunk_col_type);
+    MPI_Type_commit(&chunk_col_type);
+
+    for (current_step = 0; c < steps; current_step++) {
+
+        //Enviar datos a los procesos vecinos
+        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[UP], 0, new_comm, &request);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[DOWN], 0, new_comm, &request);
+        MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &request);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_com, &request);
+
+        //Calcular los estados internos
+        for (i = 1; i < chunk_rows-1; i++) {
+            for (j = 1; j < chunk_cols-1; j++) {
+                //Suma las celdas vecinas para saber cuantas están vivas
+                live_neighbours = old_buffer[i - 1][j - 1];
+                live_neighbours+= old_buffer[i - 1][j];
+                live_neighbours+= old_buffer[i - 1][j + 1];
+                live_neighbours+= old_buffer[i][j - 1];
+                live_neighbours+= old_buffer[i][j + 1];
+                live_neighbours+= old_buffer[i + 1][j - 1];
+                live_neighbours+= old_buffer[i + 1][j];
+                live_neighbours+= old_buffer[i + 1][j + 1];
+
+                if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                    new_buffer[i][j] = ((live_neighbours == 2 || live_neighbours == 3)) ? 1 : 0;
+                else //Si está muerta y tiene 3 vecinas vivas revive
+                    new_buffer[i][j] = (live_neighbours == 3) ? 1 : 0;
+            }
+        }
+
+        //Recibir cambios de los vecinos y procesarlos bordes
+
+        //Enviar cambios a los vecinos
+    }
 
     MPI_Finalize();
 
