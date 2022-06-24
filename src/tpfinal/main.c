@@ -267,18 +267,19 @@ int main(int argc, char **argv)
     }
 
     /* Computar estados del mundo */
-    /*int current_step;
+    int current_step;
     int live_neighbors;
+    char corners[4] = {0, 0, 0, 0};
     char (*aux_buffer)[chunk_cols];
     char (*outer_rows)[chunk_cols];
     char (*outer_cols)[2];
     memset(outer_rows, 0, sizeof(sizeof(char[2][chunk_cols])));
     memset(outer_cols, 0, sizeof(sizeof(char[chunk_rows][2])));
 
-    MPI_Status status;
-    MPI_Request request;
-    MPI_Status recv_status;
-    MPI_Request recv_request;
+    MPI_Status send_status[8];
+    MPI_Status recv_status[8];
+    MPI_Request send_request[8];
+    MPI_Request recv_request[8];
 
     //Tipo derivado para columna de la partición de datos
     MPI_Datatype chunk_col_type;
@@ -288,12 +289,22 @@ int main(int argc, char **argv)
     for (current_step = 0; current_step < steps; current_step++) {
 
         //Enviar datos a los procesos vecinos
-        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &request);
-        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &request);
-        MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &request);
-        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_com, &request);
+        MPI_Isend(&old_buffer[0][0], 1, MPI_CHAR, next_ranks[TOP_LEFT], 0, new_comm, &send_request[TOP_LEFT]);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &send_request[TOP_RIGHT]);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &send_request[BOTTOM_LEFT]);
+        MPI_Isend(&old_buffer[chunk_rows-1][chunk_cols-1], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &send_request[BOTTOM_RIGHT]);
+        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &send_request[TOP]);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &send_request[BOTTOM]);
+        MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &send_request[LEFT]);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_com, &send_request[RIGHT]);
 
-        MPI_Irecv(buf, chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request);
+        //Recibir datos de los procesos vecinos en forma no bloqueante
+        for (i = 0; i < 4; i++)
+            MPI_Irecv(&corners[i], 1, MPI_CHAR, next_ranks[TOP_LEFT+i], 0, new_comm, &recv_request[TOP_LEFT+i]);
+        MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request[TOP]);
+        MPI_Irecv(&outer_rows[1], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &recv_request[BOTTOM]);
+        MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], 0, new_comm, &recv_request[LEFT]);
+        MPI_Irecv(&outer_cols[1], chunk_rows, MPI_CHAR, next_ranks[RIGHT], 0, new_comm, &recv_request[RIGHT]);
 
         //Calcular los estados internos
         for (i = 1; i < chunk_rows-1; i++) {
@@ -315,10 +326,10 @@ int main(int argc, char **argv)
             }
         }
 
-        //Recibir cambios de los vecinos y procesarlos bordes
+        //Recibir cambios de los vecinos y procesar los bordes
 
-        //Enviar cambios a los vecinos
-    }*/
+
+    }
 
     MPI_Finalize();
 
