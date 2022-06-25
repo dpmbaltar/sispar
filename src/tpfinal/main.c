@@ -293,20 +293,25 @@ int main(int argc, char **argv)
         MPI_Isend(&old_buffer[0][chunk_cols-1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &send_request[TOP_RIGHT]);
         MPI_Isend(&old_buffer[chunk_rows-1][0], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &send_request[BOTTOM_LEFT]);
         MPI_Isend(&old_buffer[chunk_rows-1][chunk_cols-1], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &send_request[BOTTOM_RIGHT]);
-        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &send_request[TOP]);
+        /*MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &send_request[TOP]);
         MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &send_request[BOTTOM]);
         MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &send_request[LEFT]);
         MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_comm, &send_request[RIGHT]);
-
+*/
         //Recibir datos de los procesos vecinos en forma no bloqueante
         MPI_Irecv(&corners[0], 1, MPI_CHAR, next_ranks[TOP_LEFT], 0, new_comm, &recv_request[TOP_LEFT]);
         MPI_Irecv(&corners[1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &recv_request[TOP_RIGHT]);
         MPI_Irecv(&corners[2], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &recv_request[BOTTOM_LEFT]);
         MPI_Irecv(&corners[3], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &recv_request[BOTTOM_RIGHT]);
-        MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request[TOP]);
+        /*MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request[TOP]);
         MPI_Irecv(&outer_rows[1], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &recv_request[BOTTOM]);
         MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], 0, new_comm, &recv_request[LEFT]);
         MPI_Irecv(&outer_cols[1], chunk_rows, MPI_CHAR, next_ranks[RIGHT], 0, new_comm, &recv_request[RIGHT]);
+*/
+        MPI_Wait(&recv_request[TOP_LEFT], &recv_status[TOP_LEFT]);
+        MPI_Wait(&recv_request[TOP_RIGHT], &recv_status[TOP_RIGHT]);
+        MPI_Wait(&recv_request[BOTTOM_LEFT], &recv_status[BOTTOM_LEFT]);
+        MPI_Wait(&recv_request[BOTTOM_RIGHT], &recv_status[BOTTOM_RIGHT]);
 
         //Calcular los estados internos
         for (i = 1; i < chunk_rows-1; i++) {
@@ -317,15 +322,15 @@ int main(int argc, char **argv)
                 live_neighbors+= old_buffer[i][j+1] + old_buffer[i+1][j-1];
                 live_neighbors+= old_buffer[i+1][j] + old_buffer[i+1][j+1];
                 //Segfault??:
-                /*if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                     new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
-                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;*/
+                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;
             }
         }
 
         //Recibir cambios de los vecinos y procesar los bordes
-        MPI_Waitall(8, recv_request, recv_status);
+        //MPI_Waitall(8, recv_request, recv_status);
 /*
         //Procesar esquina superior izquierda
         live_neighbors = corners[0];
