@@ -345,10 +345,10 @@ int main(int argc, char **argv)
         live_neighbors+= outer_rows[0][chunk_cols-2] + outer_rows[0][chunk_cols-1];
         live_neighbors+= outer_cols[1][0] + outer_cols[1][1];
         live_neighbors+= old_buffer[0][chunk_cols-2] + old_buffer[1][chunk_cols-2] + old_buffer[1][chunk_cols-1];
-        if (old_buffer[0][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
-            new_buffer[0][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+        if (old_buffer[0][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            new_buffer[0][chunk_cols-1] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
         else //Si está muerta y tiene 3 vecinas vivas revive
-            new_buffer[0][0] = (live_neighbors == 3) ? 1 : 0;
+            new_buffer[0][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
 
         //Procesar interior de la fila superior
         for (i = 1; i < chunk_cols-2; i++) {
