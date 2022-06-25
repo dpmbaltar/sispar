@@ -316,7 +316,7 @@ int main(int argc, char **argv)
                 live_neighbors+= old_buffer[i-1][j+1] + old_buffer[i][j-1];
                 live_neighbors+= old_buffer[i][j+1] + old_buffer[i+1][j-1];
                 live_neighbors+= old_buffer[i+1][j] + old_buffer[i+1][j+1];
-
+                //Segfault??:
                 /*if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                     new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
@@ -386,9 +386,9 @@ int main(int argc, char **argv)
 
         //Intercambio de punteros, para realizar el siguiente paso con los nuevos
         //estados calculados
-        /*aux_buffer = old_buffer;
+        aux_buffer = old_buffer;
         old_buffer = new_buffer;
-        new_buffer = aux_buffer;*/
+        new_buffer = aux_buffer;
     }
 
     MPI_Status end_recv_status[size];
