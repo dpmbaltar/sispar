@@ -434,8 +434,8 @@ int main(int argc, char **argv)
     MPI_Request end_recv_request;
 
     if (rank == root) {
-        /*char(*chunk_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
-        memset(chunk_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));*/
+        char(*chunk_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
+        memset(chunk_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
 
         for (i = 1; i < size; i++) {
             int pcoords[2] = {0,0};
@@ -443,14 +443,18 @@ int main(int argc, char **argv)
             int offset_rows = pcoords[0] * chunk_rows;
             int offset_cols = pcoords[1] * chunk_cols;
             //MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
-            MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
+            //MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
+            //MPI_Wait(&end_recv_request, &end_recv_status);
+
+            MPI_Irecv(chunk_buffer, chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
             MPI_Wait(&end_recv_request, &end_recv_status);
-            //MPI_Irecv(chunk_buffer, chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request[i-1]);
-            //MPI_Wait(&end_recv_request[i-1], &end_recv_status[i-1]);
+
+            int pos = 0;
+            MPI_Unpack(chunk_buffer, chunk_length, &pos, &old[offset_rows][offset_cols], 1, chunk_type, new_comm);
             //Ubicar datos
-            /*for (i = 0; i < chunk_rows; i++) {
-                for (j = 0; j < chunk_cols; j++) {
-                    old[offset_rows][offset_cols] = chunk_buffer[i][j];
+            /*for (int l = 0; l < chunk_rows; l++) {
+                for (int m = 0; m < chunk_cols; m++) {
+                    old[offset_rows][offset_cols] = chunk_buffer[l][m];
                     offset_cols++;
                 }
                 offset_rows++;
