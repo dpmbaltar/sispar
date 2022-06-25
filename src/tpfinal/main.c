@@ -131,8 +131,8 @@ int main(int argc, char **argv)
     int chunk_length = chunk_rows * chunk_cols;
     char(*old_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
     char(*new_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
-    memset(old_buffer, 0, sizeof(sizeof(char[chunk_rows][chunk_cols])));
-    memset(new_buffer, 0, sizeof(sizeof(char[chunk_rows][chunk_cols])));
+    memset(old_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
+    memset(new_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
 
     //chunk_remains[ROWS] = rows % dims[ROWS];
     //chunk_remains[COLS] = cols % dims[COLS];
@@ -215,16 +215,18 @@ int main(int argc, char **argv)
         int pos = 0;
         MPI_Pack(old, 1, chunk_type, old_buffer, chunk_length, &pos, new_comm);
 
-        MPI_Status status;
-        MPI_Request request;
+        MPI_Status status[size-1];
+        MPI_Request request[size-1];
 
         for (i = 1; i < size; i++) {
             int pcoords[2] = {0,0};
             MPI_Cart_coords(new_comm, i, N_DIMS, pcoords);
             int offset_rows = pcoords[0] * chunk_rows;
             int offset_cols = pcoords[1] * chunk_cols;
-            MPI_Isend(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &request);
+            MPI_Isend(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &request[i-1]);
         }
+
+        //MPI_Waitall(size-1, request, status);
 
         /*MPI_Scatter(old, 1, chunk_type,
                     old_buffer, chunk_length, MPI_CHAR,
@@ -271,10 +273,10 @@ int main(int argc, char **argv)
     int live_neighbors;
     char corners[4] = {0, 0, 0, 0};
     char (*aux_buffer)[chunk_cols];
-    char (*outer_rows)[chunk_cols] = malloc(sizeof(sizeof(char[2][chunk_cols])));
-    char (*outer_cols)[chunk_rows] = malloc(sizeof(sizeof(char[2][chunk_rows])));
-    memset(outer_rows, 0, sizeof(sizeof(char[2][chunk_cols])));
-    memset(outer_cols, 0, sizeof(sizeof(char[2][chunk_rows])));
+    char (*outer_rows)[chunk_cols] = malloc(sizeof(char[2][chunk_cols]));
+    char (*outer_cols)[chunk_rows] = malloc(sizeof(char[2][chunk_rows]));
+    memset(outer_rows, 0, sizeof(char[2][chunk_cols]));
+    memset(outer_cols, 0, sizeof(char[2][chunk_rows]));
 
     MPI_Status send_status[8];
     MPI_Status recv_status[8];
@@ -283,7 +285,7 @@ int main(int argc, char **argv)
 
     //Tipo derivado para columna de la partición de datos
     MPI_Datatype chunk_col_type;
-    MPI_Type_vector(chunk_rows, 1, cols, MPI_CHAR, &chunk_col_type);
+    MPI_Type_vector(chunk_rows, 1, chunk_cols, MPI_CHAR, &chunk_col_type);
     MPI_Type_commit(&chunk_col_type);
 
     for (current_step = 0; current_step < steps; current_step++) {
@@ -298,17 +300,16 @@ int main(int argc, char **argv)
         MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &send_request[LEFT]);
         MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_comm, &send_request[RIGHT]);
 
-        //MPI_Waitall(8, send_request, send_status);
+        MPI_Waitall(8, send_request, send_status);
 
         //Calcular los estados internos
         for (i = 1; i < chunk_rows-1; i++) {
             for (j = 1; j < chunk_cols-1; j++) {
                 //Suma las celdas vecinas para saber cuantas están vivas
-                live_neighbors = old_buffer[i-1][j-1] + old_buffer[i-1][j];
-                live_neighbors+= old_buffer[i-1][j+1] + old_buffer[i][j-1];
-                live_neighbors+= old_buffer[i][j+1] + old_buffer[i+1][j-1];
-                live_neighbors+= old_buffer[i+1][j] + old_buffer[i+1][j+1];
-                //Segfault??:
+                live_neighbors = old_buffer[i-1][j-1] + old_buffer[i-1][j] + old_buffer[i-1][j+1];
+                live_neighbors+= old_buffer[i][j-1] + old_buffer[i][j+1];
+                live_neighbors+= old_buffer[i+1][j-1] + old_buffer[i+1][j] + old_buffer[i+1][j+1];
+                
                 if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                     new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
@@ -420,21 +421,44 @@ int main(int argc, char **argv)
         new_buffer = aux_buffer;
     }
 
-    MPI_Status end_recv_status[size];
-    MPI_Request end_recv_request[size];
+    printf("\n");
+    for (i = 0; i < chunk_rows; i++) {
+        for (j = 0; j < chunk_cols; j++)
+            printf("%c", old_buffer[i][j] == 0 ? '.' : 'O');
+        printf("\n");
+    }
+
+    /*MPI_Status end_recv_status[size-1];
+    MPI_Request end_recv_request[size-1];*/
+    MPI_Status end_recv_status;
+    MPI_Request end_recv_request;
 
     if (rank == root) {
-
+        /*char(*chunk_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
+        memset(chunk_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));*/
 
         for (i = 1; i < size; i++) {
             int pcoords[2] = {0,0};
             MPI_Cart_coords(new_comm, i, N_DIMS, pcoords);
             int offset_rows = pcoords[0] * chunk_rows;
             int offset_cols = pcoords[1] * chunk_cols;
-            MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request[i]);
+            //MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
+            MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
+            MPI_Wait(&end_recv_request, &end_recv_status);
+            //MPI_Irecv(chunk_buffer, chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request[i-1]);
+            //MPI_Wait(&end_recv_request[i-1], &end_recv_status[i-1]);
+            //Ubicar datos
+            /*for (i = 0; i < chunk_rows; i++) {
+                for (j = 0; j < chunk_cols; j++) {
+                    old[offset_rows][offset_cols] = chunk_buffer[i][j];
+                    offset_cols++;
+                }
+                offset_rows++;
+                offset_cols-= chunk_cols;
+            }*/
         }
-
-        MPI_Waitall(size, end_recv_request, end_recv_status);
+        //&old[offset_rows][offset_cols]
+        //MPI_Waitall(size-1, end_recv_request, end_recv_status);
 
         printf("cols %d \nrows %d \nsteps %d \n", cols, rows, steps);
         for (i = 0; i < rows; i++) {
@@ -445,7 +469,8 @@ int main(int argc, char **argv)
         }
     } else {
         MPI_Request end_send_request;
-        MPI_Isend(old_buffer, 1, chunk_type, root, 0, new_comm, &end_send_request);
+        MPI_Isend(old_buffer, chunk_length, MPI_CHAR, root, 0, new_comm, &end_send_request);
+        MPI_Wait(&end_send_request, MPI_STATUS_IGNORE);
     }
 
     MPI_Finalize();
