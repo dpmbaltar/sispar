@@ -49,16 +49,7 @@ int main(int argc, char **argv)
     ncols = cols + 2;
     printf("Rows: %d cols: %d\n", rows, cols);
 
-    //Se reserva memoria dinámica para la matriz de celdas, representada por el
-    //arreglo de punteros "old"
-    //char **old;
-    //old = malloc(rows * sizeof (char*));
-    /*for (i = 0; i < rows; i++) {
-        old[i] = (char *) malloc((cols) * sizeof (char));
-    }*/
-    //char *old;
-    //old = (char *)malloc(rows * cols * sizeof (char));
-    //memset(old, 0, rows * cols * sizeof (char));
+    //Se reserva memoria dinámica para la matriz "old"
     char(*old)[cols] = malloc (sizeof(char[rows][cols]));
     memset(old, 0, sizeof(char[rows][cols]));
     
@@ -69,10 +60,8 @@ int main(int argc, char **argv)
 
     while (i < rows && res != NULL) {
         for (j = 0; j < strlen(s) - 1; j++)
-            //old[i*cols+j] = (s[j] == '.') ? 0 : 1;
             old[i][j] = (s[j] == '.') ? 0 : 1;
         for (j = strlen(s) - 1; j < cols+2; j++)
-            //old[i*cols+j] = 0;
             old[i][j] = 0;
         res = fgets(s, cols + 2, f);
         i++;
@@ -85,7 +74,6 @@ int main(int argc, char **argv)
     fclose(f); //Se cierra el archivo
     free(s); //Se libera la memoria utilizada para recorrer el archivo
 
-    //MPI----------------------------------------------------------------------
     //Crear topología cartesiana de 2 dimensiones
     enum CartDimension {ROWS, COLS, N_DIMS};
     int dims[N_DIMS] = {0, 0};
@@ -122,10 +110,6 @@ int main(int argc, char **argv)
     printf("\n");
 
     //Establecer datos del proceso
-    //int chunk_lengths[N_DIMS]; //(cantidad de filas, cantidad de columnas)
-    //int chunk_remains[N_DIMS]; //(resto de filas, resto de columnas)
-    //chunk_lengths[ROWS] = rows / dims[ROWS];
-    //chunk_lengths[COLS] = cols / dims[COLS];
     int chunk_rows = rows / dims[ROWS];
     int chunk_cols = cols / dims[COLS];
     int chunk_length = chunk_rows * chunk_cols;
@@ -134,14 +118,6 @@ int main(int argc, char **argv)
     memset(old_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
     memset(new_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
 
-    //chunk_remains[ROWS] = rows % dims[ROWS];
-    //chunk_remains[COLS] = cols % dims[COLS];
-    //Repartir resto a los primeros procesos de la topología
-    /*if (coords[0] < chunk_remains[ROWS])
-        chunk_lengths[ROWS]++;
-    if (coords[1] < chunk_remains[COLS])
-        chunk_lengths[COLS]++;*/
-
     printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_rows, chunk_cols);
 
     MPI_Datatype chunk_type;
@@ -149,61 +125,6 @@ int main(int argc, char **argv)
     MPI_Type_commit(&chunk_type);
 
     if (rank == root) {
-        /*int proc_rows = rows / dims[ROWS];
-        int proc_cols = cols / dims[COLS];
-        /int proc_rows_rem = rows % dims[ROWS];
-        int proc_cols_rem = cols % dims[COLS];
-        MPI_Status send_st;
-        MPI_Request send_req;
-
-        //Crear tipo de datos para la porción de datos del proceso:
-        //Si la cantidad de datos por proceso no es igual para todos los procesos
-        //entonces se necesitan 2 o 4 tipos derivados distintos:
-        // TL | TR
-        // ---+---
-        // BL | BR
-        enum ChunkType {BR, BL, TR, TL, N_TYPES};
-        MPI_Datatype chunk_type[N_TYPES];
-        MPI_Type_vector(proc_rows, proc_cols, cols, MPI_CHAR, &chunk_type[BR]);
-        MPI_Type_commit(&chunk_type[BR]);
-
-        if (proc_rows_rem > 0) {
-            MPI_Type_vector(proc_rows+1, proc_cols, cols, MPI_CHAR, &chunk_type[BL]);
-            MPI_Type_commit(&chunk_type[BL]);
-        }
-        if (proc_cols_rem > 0) {
-            MPI_Type_vector(proc_rows, proc_cols+1, cols, MPI_CHAR, &chunk_type[TR]);
-            MPI_Type_commit(&chunk_type[TR]);
-        }
-        if (proc_rows_rem > 0 && proc_cols_rem > 0) {
-            MPI_Type_vector(proc_rows+1, proc_cols+1, cols, MPI_CHAR, &chunk_type[TL]);
-            MPI_Type_commit(&chunk_type[TL]);
-        }
-
-        int group_sizes[4] = {0,0,0,0};
-        int group_ranks[4][size];
-        MPI_Group world_group;
-        MPI_Group chunk_type_group[4];
-        MPI_Comm chunk_type_comm[4];
-        MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-
-        for (i = 0; i < dims[ROWS]; i++) {
-            for (j = 0; i < dims[COLS]; i++) {
-                if (i < proc_rows_rem && j < proc_cols_rem)
-                    group_sizes[TL]++;
-                    group_ranks[group_sizes[TL]] =
-            }
-        }*/
-        
-        //FALTA:
-        //- Enviar correctamente los datos a todos los procesos
-        //- Procesador los steps en cada proceso
-        //- Comunicar los cambios entre procesos
-        //MPI_Isend(&old[0][5], 1, chunk_type[TL], 1, 0, new_comm, &send_req);
-        //MPI_Isend(&old[0][10], 1, chunk_type[TL], 2, 0, new_comm, &send_req);
-        //MPI_Isend(&old[0][15], 1, chunk_type[TR], 3, 0, new_comm, &send_req);
-        //MPI_Wait(&send_req, &send_st);
-
         //Mostrar datos cargados
         for (i = 0; i < rows; i++) {
             for (j = 0; j < cols; j++) {
@@ -231,7 +152,7 @@ int main(int argc, char **argv)
         /*MPI_Scatter(old, 1, chunk_type,
                     old_buffer, chunk_length, MPI_CHAR,
                     root, new_comm);*/
-    } else {
+    } else { //Recibir datos
         /*MPI_Scatter(NULL, 1, chunk_type,
                     old_buffer, chunk_length, MPI_CHAR,
                     root, new_comm);*/
@@ -242,25 +163,6 @@ int main(int argc, char **argv)
         MPI_Wait(&request, &status);
 
     }
-
-    //Recibir datos
-    /*if (rank > 0 && rank < 4) { //if (rank > 0) {
-        MPI_Status recv_st;
-        MPI_Request recv_req;
-        int ncells = chunk_lengths[ROWS] * chunk_lengths[COLS];
-        char buf[chunk_lengths[ROWS]][chunk_lengths[COLS]];
-        memset(buf, '\0', ncells);
-
-        MPI_Irecv(buf, ncells, MPI_CHAR, 0, 0, new_comm, &recv_req);
-        MPI_Wait(&recv_req, &recv_st);
-
-        for (i = 0; i < chunk_lengths[ROWS]; i++) {
-            for (j = 0; j < chunk_lengths[COLS]; j++)
-                printf("%c", buf[i][j] == 0 ? '.' : 'O');
-            printf("\n");
-        }
-        printf("\n");
-    }*/
 
     for (i = 0; i < chunk_rows; i++) {
         for (j = 0; j < chunk_cols; j++)
@@ -421,15 +323,13 @@ int main(int argc, char **argv)
         new_buffer = aux_buffer;
     }
 
-    printf("\n");
+    /*printf("Datos locales finales:\n");
     for (i = 0; i < chunk_rows; i++) {
         for (j = 0; j < chunk_cols; j++)
             printf("%c", old_buffer[i][j] == 0 ? '.' : 'O');
         printf("\n");
-    }
+    }*/
 
-    /*MPI_Status end_recv_status[size-1];
-    MPI_Request end_recv_request[size-1];*/
     MPI_Status end_recv_status;
     MPI_Request end_recv_request;
 
@@ -444,8 +344,6 @@ int main(int argc, char **argv)
             int offset_cols = pcoords[1] * chunk_cols;
             //MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
             //MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
-            //MPI_Wait(&end_recv_request, &end_recv_status);
-
             MPI_Irecv(chunk_buffer, chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
             MPI_Wait(&end_recv_request, &end_recv_status);
 
@@ -461,9 +359,8 @@ int main(int argc, char **argv)
                 offset_cols-= chunk_cols;
             }*/
         }
-        //&old[offset_rows][offset_cols]
-        //MPI_Waitall(size-1, end_recv_request, end_recv_status);
 
+        printf("Resultado:\n");
         printf("cols %d \nrows %d \nsteps %d \n", cols, rows, steps);
         for (i = 0; i < rows; i++) {
             for (j = 0; j < cols; j++) {
