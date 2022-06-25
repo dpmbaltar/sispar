@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     //columnas auxiliares
     nrows = rows + 2;
     ncols = cols + 2;
-    printf("Rows: %d cols: %d\n", rows, cols);
+    //printf("Rows: %d cols: %d\n", rows, cols);
 
     //Se reserva memoria dinámica para la matriz "old"
     char(*old)[cols] = malloc (sizeof(char[rows][cols]));
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
     MPI_Dims_create(size, N_DIMS, dims);
     MPI_Cart_create(MPI_COMM_WORLD, N_DIMS, dims, periods, reorder, &new_comm);
-    printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
+    //printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
 
     //Obtener datos del proceso
     int coords[2];
@@ -103,11 +103,11 @@ int main(int argc, char **argv)
         MPI_Cart_rank(new_comm, corner_coords[i], &next_ranks[TOP_LEFT+i]);
     }
 
-    printf("[MPI process %d] Coords: (%d, %d).\n", rank, coords[0], coords[1]);
+    /*printf("[MPI process %d] Coords: (%d, %d).\n", rank, coords[0], coords[1]);
     printf("[MPI process %d] Neighbours:", rank);
     for (i = 0; i < 8; i++)
         printf(" %s: %d;", next_names[i], next_ranks[i]);
-    printf("\n");
+    printf("\n");*/
 
     //Establecer datos del proceso
     int chunk_rows = rows / dims[ROWS];
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
     memset(old_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
     memset(new_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
 
-    printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_rows, chunk_cols);
+    //printf("[MPI process %d] Chunk lengths: (%d, %d).\n", rank, chunk_rows, chunk_cols);
 
     MPI_Datatype chunk_type;
     MPI_Type_vector(chunk_rows, chunk_cols, cols, MPI_CHAR, &chunk_type);
@@ -126,6 +126,8 @@ int main(int argc, char **argv)
 
     if (rank == root) {
         //Mostrar datos cargados
+        printf("Entrada:\n");
+        printf("cols %d \nrows %d \nsteps %d \n", cols, rows, steps);
         for (i = 0; i < rows; i++) {
             for (j = 0; j < cols; j++) {
                 printf("%c", old[i][j] == 1 ? 'O' : '.');
@@ -164,11 +166,11 @@ int main(int argc, char **argv)
 
     }
 
-    for (i = 0; i < chunk_rows; i++) {
+    /*for (i = 0; i < chunk_rows; i++) {
         for (j = 0; j < chunk_cols; j++)
             printf("%c", old_buffer[i][j] == 0 ? '.' : 'O');
         printf("\n");
-    }
+    }*/
 
     /* Computar estados del mundo */
     int current_step;
@@ -253,7 +255,7 @@ int main(int argc, char **argv)
             new_buffer[0][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
 
         //Procesar interior de la fila superior
-        for (i = 1; i < chunk_cols-2; i++) {
+        for (i = 1; i < chunk_cols-1; i++) {
             live_neighbors = old_buffer[0][i-1] + old_buffer[0][i+1];
             live_neighbors+= old_buffer[1][i-1] + old_buffer[1][i] + old_buffer[1][i+1];
             live_neighbors+= outer_rows[0][i-1] + outer_rows[0][i] + outer_rows[0][i+1];
@@ -264,7 +266,7 @@ int main(int argc, char **argv)
         }
 
         //Procesar interior de la columna izquierda
-        for (i = 1; i < chunk_rows-2; i++) {
+        for (i = 1; i < chunk_rows-1; i++) {
             live_neighbors = old_buffer[i-1][0] + old_buffer[i+1][0];
             live_neighbors+= old_buffer[i-1][1] + old_buffer[i][1] + old_buffer[i+1][1];
             live_neighbors+= outer_cols[0][i-1] + outer_cols[0][i] + outer_cols[0][i+1];
@@ -275,7 +277,7 @@ int main(int argc, char **argv)
         }
 
         //Procesar interior de la columna derecha
-        for (i = 1; i < chunk_rows-2; i++) {
+        for (i = 1; i < chunk_rows-1; i++) {
             live_neighbors = old_buffer[i-1][chunk_cols-1] + old_buffer[i+1][chunk_cols-1];
             live_neighbors+= old_buffer[i-1][chunk_cols-2] + old_buffer[i][chunk_cols-2] + old_buffer[i+1][chunk_cols-2];
             live_neighbors+= outer_cols[1][i-1] + outer_cols[1][i] + outer_cols[1][i+1];
@@ -306,7 +308,7 @@ int main(int argc, char **argv)
             new_buffer[chunk_rows-1][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
 
         //Procesar interior de la fila inferior
-        for (i = 1; i < chunk_cols-2; i++) {
+        for (i = 1; i < chunk_cols-1; i++) {
             live_neighbors = old_buffer[chunk_rows-1][i-1] + old_buffer[chunk_rows-1][i+1];
             live_neighbors+= old_buffer[chunk_rows-2][i-1] + old_buffer[chunk_rows-2][i] + old_buffer[chunk_rows-2][i+1];
             live_neighbors+= outer_rows[1][i-1] + outer_rows[1][i] + outer_rows[1][i+1];
@@ -330,34 +332,21 @@ int main(int argc, char **argv)
         printf("\n");
     }*/
 
-    MPI_Status end_recv_status;
-    MPI_Request end_recv_request;
-
+    //Recibir datos finales y mostrarlos por pantalla
     if (rank == root) {
-        char(*chunk_buffer)[chunk_cols] = malloc(sizeof(char[chunk_rows][chunk_cols]));
-        memset(chunk_buffer, 0, sizeof(char[chunk_rows][chunk_cols]));
+        int position = 0;
+        MPI_Status end_recv_status;
+        MPI_Request end_recv_request;
+
+        MPI_Unpack(old_buffer, chunk_length, &position, &old[0][0], 1, chunk_type, new_comm);
 
         for (i = 1; i < size; i++) {
             int pcoords[2] = {0,0};
             MPI_Cart_coords(new_comm, i, N_DIMS, pcoords);
             int offset_rows = pcoords[0] * chunk_rows;
             int offset_cols = pcoords[1] * chunk_cols;
-            //MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
-            //MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
-            MPI_Irecv(chunk_buffer, chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request);
+            MPI_Irecv(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &end_recv_request);
             MPI_Wait(&end_recv_request, &end_recv_status);
-
-            int pos = 0;
-            MPI_Unpack(chunk_buffer, chunk_length, &pos, &old[offset_rows][offset_cols], 1, chunk_type, new_comm);
-            //Ubicar datos
-            /*for (int l = 0; l < chunk_rows; l++) {
-                for (int m = 0; m < chunk_cols; m++) {
-                    old[offset_rows][offset_cols] = chunk_buffer[l][m];
-                    offset_cols++;
-                }
-                offset_rows++;
-                offset_cols-= chunk_cols;
-            }*/
         }
 
         printf("Resultado:\n");
@@ -368,7 +357,7 @@ int main(int argc, char **argv)
             }
             printf("\n");
         }
-    } else {
+    } else { //Enviar los datos finales al proceso raíz
         MPI_Request end_send_request;
         MPI_Isend(old_buffer, chunk_length, MPI_CHAR, root, 0, new_comm, &end_send_request);
         MPI_Wait(&end_send_request, MPI_STATUS_IGNORE);
