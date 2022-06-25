@@ -271,10 +271,10 @@ int main(int argc, char **argv)
     int live_neighbors;
     char corners[4] = {0, 0, 0, 0};
     char (*aux_buffer)[chunk_cols];
-    char (*outer_rows)[chunk_cols];
-    char (*outer_cols)[2];
+    char (*outer_rows)[chunk_cols] = malloc(sizeof(sizeof(char[2][chunk_cols])));
+    char (*outer_cols)[chunk_rows] = malloc(sizeof(sizeof(char[2][chunk_rows])));
     memset(outer_rows, 0, sizeof(sizeof(char[2][chunk_cols])));
-    memset(outer_cols, 0, sizeof(sizeof(char[chunk_rows][2])));
+    memset(outer_cols, 0, sizeof(sizeof(char[2][chunk_rows])));
 
     MPI_Status send_status[8];
     MPI_Status recv_status[8];
@@ -296,11 +296,13 @@ int main(int argc, char **argv)
         MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &send_request[TOP]);
         MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &send_request[BOTTOM]);
         MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &send_request[LEFT]);
-        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_com, &send_request[RIGHT]);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_comm, &send_request[RIGHT]);
 
         //Recibir datos de los procesos vecinos en forma no bloqueante
-        for (i = 0; i < 4; i++)
-            MPI_Irecv(&corners[i], 1, MPI_CHAR, next_ranks[TOP_LEFT+i], 0, new_comm, &recv_request[TOP_LEFT+i]);
+        MPI_Irecv(&corners[0], 1, MPI_CHAR, next_ranks[TOP_LEFT], 0, new_comm, &recv_request[TOP_LEFT]);
+        MPI_Irecv(&corners[1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &recv_request[TOP_RIGHT]);
+        MPI_Irecv(&corners[2], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &recv_request[BOTTOM_LEFT]);
+        MPI_Irecv(&corners[3], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &recv_request[BOTTOM_RIGHT]);
         MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request[TOP]);
         MPI_Irecv(&outer_rows[1], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &recv_request[BOTTOM]);
         MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], 0, new_comm, &recv_request[LEFT]);
@@ -310,25 +312,111 @@ int main(int argc, char **argv)
         for (i = 1; i < chunk_rows-1; i++) {
             for (j = 1; j < chunk_cols-1; j++) {
                 //Suma las celdas vecinas para saber cuantas están vivas
-                live_neighbors = old_buffer[i-1][j-1];
-                live_neighbors+= old_buffer[i-1][j];
-                live_neighbors+= old_buffer[i-1][j+1];
-                live_neighbors+= old_buffer[i][j-1];
-                live_neighbors+= old_buffer[i][j+1];
-                live_neighbors+= old_buffer[i+1][j-1];
-                live_neighbors+= old_buffer[i+1][j];
-                live_neighbors+= old_buffer[i+1][j+1];
+                live_neighbors = old_buffer[i-1][j-1] + old_buffer[i-1][j];
+                live_neighbors+= old_buffer[i-1][j+1] + old_buffer[i][j-1];
+                live_neighbors+= old_buffer[i][j+1] + old_buffer[i+1][j-1];
+                live_neighbors+= old_buffer[i+1][j] + old_buffer[i+1][j+1];
 
-                if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                /*if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                     new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
-                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;
+                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;*/
             }
         }
 
         //Recibir cambios de los vecinos y procesar los bordes
+        MPI_Waitall(8, recv_request, recv_status);
+/*
+        //Procesar esquina superior izquierda
+        live_neighbors = corners[0];
+        live_neighbors+= outer_rows[0][0] + outer_rows[0][1];
+        live_neighbors+= outer_cols[0][0] + outer_cols[0][1];
+        live_neighbors+= old_buffer[0][1] + old_buffer[1][0] + old_buffer[1][1];
+        if (old_buffer[0][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            new_buffer[0][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+        else //Si está muerta y tiene 3 vecinas vivas revive
+            new_buffer[0][0] = (live_neighbors == 3) ? 1 : 0;
+
+        //Procesar esquina superior derecha
+        live_neighbors = corners[1];
+        live_neighbors+= outer_rows[0][chunk_cols-2] + outer_rows[0][chunk_cols-1];
+        live_neighbors+= outer_cols[1][0] + outer_cols[1][1];
+        live_neighbors+= old_buffer[0][chunk_cols-2] + old_buffer[1][chunk_cols-2] + old_buffer[1][chunk_cols-1];
+        if (old_buffer[0][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            new_buffer[0][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+        else //Si está muerta y tiene 3 vecinas vivas revive
+            new_buffer[0][0] = (live_neighbors == 3) ? 1 : 0;
+
+        //Procesar interior de la fila superior
+        for (i = 1; i < chunk_cols-2; i++) {
+            live_neighbors = old_buffer[0][i-1] + old_buffer[0][i+1];
+            live_neighbors+= old_buffer[1][i-1] + old_buffer[1][i] + old_buffer[1][i+1];
+            live_neighbors+= outer_rows[0][i-1] + outer_rows[0][i] + outer_rows[0][i+1];
+            if (old_buffer[0][i] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                new_buffer[0][i] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+            else //Si está muerta y tiene 3 vecinas vivas revive
+                new_buffer[0][i] = (live_neighbors == 3) ? 1 : 0;
+        }
+
+        //Procesar interior de la columna izquierda
+        for (i = 1; i < chunk_rows-2; i++) {
+            live_neighbors = old_buffer[i-1][0] + old_buffer[i+1][0];
+            live_neighbors+= old_buffer[i-1][1] + old_buffer[i][1] + old_buffer[i+1][1];
+            live_neighbors+= outer_cols[0][i-1] + outer_cols[0][i] + outer_cols[0][i+1];
+            if (old_buffer[i][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                new_buffer[i][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+            else //Si está muerta y tiene 3 vecinas vivas revive
+                new_buffer[i][0] = (live_neighbors == 3) ? 1 : 0;
+        }
+
+        //Procesar interior de la columna derecha
+        for (i = 1; i < chunk_rows-2; i++) {
+            live_neighbors = old_buffer[i-1][chunk_cols-1] + old_buffer[i+1][chunk_cols-1];
+            live_neighbors+= old_buffer[i-1][chunk_cols-2] + old_buffer[i][chunk_cols-2] + old_buffer[i+1][chunk_cols-2];
+            live_neighbors+= outer_cols[1][i-1] + outer_cols[1][i] + outer_cols[1][i+1];
+            if (old_buffer[i][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                new_buffer[i][chunk_cols-1] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
+            else //Si está muerta y tiene 3 vecinas vivas revive
+                new_buffer[i][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
+        }
+
+        //Procesar esquina inferior izquierda
+        //Procesar esquina inferior derecha
+        //Procesar interior de la fila inferior*/
+
+        //Intercambio de punteros, para realizar el siguiente paso con los nuevos
+        //estados calculados
+        /*aux_buffer = old_buffer;
+        old_buffer = new_buffer;
+        new_buffer = aux_buffer;*/
+    }
+
+    MPI_Status end_recv_status[size];
+    MPI_Request end_recv_request[size];
+
+    if (rank == root) {
 
 
+        for (i = 1; i < size; i++) {
+            int pcoords[2] = {0,0};
+            MPI_Cart_coords(new_comm, i, N_DIMS, pcoords);
+            int offset_rows = pcoords[0] * chunk_rows;
+            int offset_cols = pcoords[1] * chunk_cols;
+            MPI_Irecv(&old[offset_rows][offset_cols], chunk_length, MPI_CHAR, i, 0, new_comm, &end_recv_request[i]);
+        }
+
+        MPI_Waitall(size, end_recv_request, end_recv_status);
+
+        printf("cols %d \nrows %d \nsteps %d \n", cols, rows, steps);
+        for (i = 0; i < rows; i++) {
+            for (j = 0; j < cols; j++) {
+                printf("%c", old[i][j] == 1 ? 'O' : '.');
+            }
+            printf("\n");
+        }
+    } else {
+        MPI_Request end_send_request;
+        MPI_Isend(old_buffer, 1, chunk_type, root, 0, new_comm, &end_send_request);
     }
 
     MPI_Finalize();
