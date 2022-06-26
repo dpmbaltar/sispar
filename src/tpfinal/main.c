@@ -4,6 +4,15 @@
 #include <string.h>
 #include <mpi.h>
 
+/**
+ * Macro para calcular siguiente estado de un elemento.
+ */
+#define NEXT_STEP(i,j,neighbors,oldbuf,newbuf)                                 \
+    if ((oldbuf)[(i)][(j)] == 1)                                               \
+        (newbuf)[(i)][(j)] = (((neighbors) == 2 || (neighbors) == 3)) ? 1 : 0; \
+    else                                                                       \
+        (newbuf)[(i)][(j)] = ((neighbors) == 3) ? 1 : 0;
+
 int main(int argc, char **argv)
 {
     FILE *f;
@@ -214,10 +223,11 @@ int main(int argc, char **argv)
                 live_neighbors+= old_buffer[i][j-1] + old_buffer[i][j+1];
                 live_neighbors+= old_buffer[i+1][j-1] + old_buffer[i+1][j] + old_buffer[i+1][j+1];
                 
-                if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+                NEXT_STEP(i, j, live_neighbors, old_buffer, new_buffer);
+                /*if (old_buffer[i][j] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                     new_buffer[i][j] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
                 else //Si está muerta y tiene 3 vecinas vivas revive
-                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;
+                    new_buffer[i][j] = (live_neighbors == 3) ? 1 : 0;*/
             }
         }
 
@@ -239,30 +249,33 @@ int main(int argc, char **argv)
         live_neighbors+= outer_rows[0][0] + outer_rows[0][1];
         live_neighbors+= outer_cols[0][0] + outer_cols[0][1];
         live_neighbors+= old_buffer[0][1] + old_buffer[1][0] + old_buffer[1][1];
-        if (old_buffer[0][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+        NEXT_STEP(0, 0, live_neighbors, old_buffer, new_buffer);
+        /*if (old_buffer[0][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
             new_buffer[0][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
         else //Si está muerta y tiene 3 vecinas vivas revive
-            new_buffer[0][0] = (live_neighbors == 3) ? 1 : 0;
+            new_buffer[0][0] = (live_neighbors == 3) ? 1 : 0;*/
 
         //Procesar esquina superior derecha
         live_neighbors = corners[1];
         live_neighbors+= outer_rows[0][chunk_cols-2] + outer_rows[0][chunk_cols-1];
         live_neighbors+= outer_cols[1][0] + outer_cols[1][1];
         live_neighbors+= old_buffer[0][chunk_cols-2] + old_buffer[1][chunk_cols-2] + old_buffer[1][chunk_cols-1];
-        if (old_buffer[0][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+        NEXT_STEP(0, chunk_cols-1, live_neighbors, old_buffer, new_buffer);
+        /*if (old_buffer[0][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
             new_buffer[0][chunk_cols-1] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
         else //Si está muerta y tiene 3 vecinas vivas revive
-            new_buffer[0][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
+            new_buffer[0][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;*/
 
         //Procesar interior de la fila superior
         for (i = 1; i < chunk_cols-1; i++) {
             live_neighbors = old_buffer[0][i-1] + old_buffer[0][i+1];
             live_neighbors+= old_buffer[1][i-1] + old_buffer[1][i] + old_buffer[1][i+1];
             live_neighbors+= outer_rows[0][i-1] + outer_rows[0][i] + outer_rows[0][i+1];
-            if (old_buffer[0][i] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            NEXT_STEP(0, i, live_neighbors, old_buffer, new_buffer);
+            /*if (old_buffer[0][i] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                 new_buffer[0][i] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
             else //Si está muerta y tiene 3 vecinas vivas revive
-                new_buffer[0][i] = (live_neighbors == 3) ? 1 : 0;
+                new_buffer[0][i] = (live_neighbors == 3) ? 1 : 0;*/
         }
 
         //Procesar interior de la columna izquierda
@@ -270,10 +283,11 @@ int main(int argc, char **argv)
             live_neighbors = old_buffer[i-1][0] + old_buffer[i+1][0];
             live_neighbors+= old_buffer[i-1][1] + old_buffer[i][1] + old_buffer[i+1][1];
             live_neighbors+= outer_cols[0][i-1] + outer_cols[0][i] + outer_cols[0][i+1];
-            if (old_buffer[i][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            NEXT_STEP(i, 0, live_neighbors, old_buffer, new_buffer);
+            /*if (old_buffer[i][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                 new_buffer[i][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
             else //Si está muerta y tiene 3 vecinas vivas revive
-                new_buffer[i][0] = (live_neighbors == 3) ? 1 : 0;
+                new_buffer[i][0] = (live_neighbors == 3) ? 1 : 0;*/
         }
 
         //Procesar interior de la columna derecha
@@ -281,10 +295,11 @@ int main(int argc, char **argv)
             live_neighbors = old_buffer[i-1][chunk_cols-1] + old_buffer[i+1][chunk_cols-1];
             live_neighbors+= old_buffer[i-1][chunk_cols-2] + old_buffer[i][chunk_cols-2] + old_buffer[i+1][chunk_cols-2];
             live_neighbors+= outer_cols[1][i-1] + outer_cols[1][i] + outer_cols[1][i+1];
-            if (old_buffer[i][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            NEXT_STEP(i, chunk_cols-1, live_neighbors, old_buffer, new_buffer);
+            /*if (old_buffer[i][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                 new_buffer[i][chunk_cols-1] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
             else //Si está muerta y tiene 3 vecinas vivas revive
-                new_buffer[i][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
+                new_buffer[i][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;*/
         }
 
         //Procesar esquina inferior izquierda
@@ -292,30 +307,33 @@ int main(int argc, char **argv)
         live_neighbors+= outer_rows[1][0] + outer_rows[1][1];
         live_neighbors+= outer_cols[0][chunk_rows-2] + outer_cols[0][chunk_rows-1];
         live_neighbors+= old_buffer[chunk_rows-1][1] + old_buffer[chunk_rows-2][0] + old_buffer[chunk_rows-2][1];
-        if (old_buffer[chunk_rows-1][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+        NEXT_STEP(chunk_rows-1, 0, live_neighbors, old_buffer, new_buffer);
+        /*if (old_buffer[chunk_rows-1][0] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
             new_buffer[chunk_rows-1][0] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
         else //Si está muerta y tiene 3 vecinas vivas revive
-            new_buffer[chunk_rows-1][0] = (live_neighbors == 3) ? 1 : 0;
+            new_buffer[chunk_rows-1][0] = (live_neighbors == 3) ? 1 : 0;*/
 
         //Procesar esquina inferior derecha
         live_neighbors = corners[3];
         live_neighbors+= outer_rows[1][chunk_cols-2] + outer_rows[1][chunk_cols-1];
         live_neighbors+= outer_cols[1][chunk_rows-2] + outer_cols[1][chunk_rows-1];
         live_neighbors+= old_buffer[chunk_rows-1][chunk_cols-2] + old_buffer[chunk_rows-2][chunk_cols-2] + old_buffer[chunk_rows-2][chunk_cols-1];
-        if (old_buffer[chunk_rows-1][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+        NEXT_STEP(chunk_rows-1, chunk_cols-1, live_neighbors, old_buffer, new_buffer);
+        /*if (old_buffer[chunk_rows-1][chunk_cols-1] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
             new_buffer[chunk_rows-1][chunk_cols-1] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
         else //Si está muerta y tiene 3 vecinas vivas revive
-            new_buffer[chunk_rows-1][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;
+            new_buffer[chunk_rows-1][chunk_cols-1] = (live_neighbors == 3) ? 1 : 0;*/
 
         //Procesar interior de la fila inferior
         for (i = 1; i < chunk_cols-1; i++) {
             live_neighbors = old_buffer[chunk_rows-1][i-1] + old_buffer[chunk_rows-1][i+1];
             live_neighbors+= old_buffer[chunk_rows-2][i-1] + old_buffer[chunk_rows-2][i] + old_buffer[chunk_rows-2][i+1];
             live_neighbors+= outer_rows[1][i-1] + outer_rows[1][i] + outer_rows[1][i+1];
-            if (old_buffer[chunk_rows-1][i] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
+            NEXT_STEP(chunk_rows-1, i, live_neighbors, old_buffer, new_buffer);
+            /*if (old_buffer[chunk_rows-1][i] == 1) //si tiene 2 o 3 vecinas vivas, sigue viva
                 new_buffer[chunk_rows-1][i] = ((live_neighbors == 2 || live_neighbors == 3)) ? 1 : 0;
             else //Si está muerta y tiene 3 vecinas vivas revive
-                new_buffer[chunk_rows-1][i] = (live_neighbors == 3) ? 1 : 0;
+                new_buffer[chunk_rows-1][i] = (live_neighbors == 3) ? 1 : 0;*/
         }
 
         //Intercambio de punteros, para realizar el siguiente paso con los nuevos
