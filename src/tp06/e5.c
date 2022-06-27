@@ -2,10 +2,11 @@
 #include <time.h>
 #include <unistd.h>
 
-double sample_time() {
+double sample_time()
+{
    struct timespec tv;
    clock_gettime(CLOCK_MONOTONIC_RAW, &tv);
-   return ((double)tv.tv_sec+((double)tv.tv_nsec)/1000000000.0);
+   return ((double)tv.tv_sec + ((double)tv.tv_nsec)/1000000000.0);
 }
 
 void main ()

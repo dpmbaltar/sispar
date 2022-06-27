@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-int main()
+void main()
 {
     int id;
 
@@ -12,6 +12,4 @@ int main()
         #pragma omp barrier
         printf("%d: Adios!\n", id);
     }
-
-    return 0;
 }

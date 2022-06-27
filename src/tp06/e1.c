@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <omp.h>
 
-int main(int argc, char **argv)
+void main(int argc, char **argv)
 {
     int id;
 
@@ -12,6 +12,4 @@ int main(int argc, char **argv)
         usleep(500);
         printf("Soy el hilo %d de %d hilos...\n", id, omp_get_num_threads());
     }
-
-    return 0;
 }

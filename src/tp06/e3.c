@@ -2,22 +2,20 @@
 #include <unistd.h>
 #include <omp.h>
 
-int inc(int var){
+int inc(int var)
+{
     usleep(1000);
     return var + 1;
 }
 
-int main(int argc, char **argv)
+void main(int argc, char **argv)
 {
-    int var;
+    int var = 10;
 
-    var = 10;
     { //región paralela
         var = inc(var);
         printf("var (in): %d\n", var);
     }
 
     printf("var (out): %d\n", var);
-
-    return 0;
 }

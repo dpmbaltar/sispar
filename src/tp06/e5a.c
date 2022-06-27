@@ -4,32 +4,36 @@
 #include <unistd.h>
 #include <omp.h>
 
-double sample_time() {
+double sample_time()
+{
    struct timespec tv;
    clock_gettime(CLOCK_MONOTONIC_RAW, &tv);
-   return ((double)tv.tv_sec+((double)tv.tv_nsec)/1000000000.0);
+   return ((double)tv.tv_sec + ((double)tv.tv_nsec)/1000000000.0);
 }
 
 void main ()
 {
     double t;
-    long num_steps = 800000000;
-    double step;
+    long num_steps = 800000000; //Pasos totales
+    double step; //Paso actual
     int i;
     double x, pi, sum = 0.0;
-    int step_init;
-    int thread_num_steps;
-    int thread_num = 0;
-    int nthreads = omp_get_max_threads();
+    int step_init; //Paso inicial local del thread
+    int thread_num_steps; //Cantidad de pasos por thread
+    int thread_num = 0; //Número de thread
+    int nthreads = omp_get_max_threads(); //Cantidad de threads
     double thread_sum[nthreads];
-
     memset(thread_sum, 0, sizeof(double) * nthreads);
+
+    //Establecer número de threads dinámicos
+    omp_set_dynamic(1);
     omp_set_num_threads(nthreads);
 
     thread_num_steps = num_steps / nthreads;
-    step = 1.0/(double) num_steps;
+    step = 1.0/(double)num_steps;
     t = sample_time();
     //printf("nthreads: %d\nthread_num_steps: %d\n\n", nthreads, thread_num_steps);
+
     #pragma omp parallel \
                 private(i, x, num_steps, step_init, thread_num) \
                 firstprivate(thread_num_steps)
@@ -38,6 +42,7 @@ void main ()
         step_init = thread_num * thread_num_steps;
         num_steps = step_init + thread_num_steps;
         //printf("thread_num: %d\n step_init: %d\n num_steps: %d\n", thread_num, step_init, num_steps);
+
         for (i = step_init; i < num_steps; i++) {
             x = (i + 0.5) * step;
             thread_sum[thread_num] += 4.0 / (1.0 + x * x);

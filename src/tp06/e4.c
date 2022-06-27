@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-int main()
+void main()
 {
     int id;
 
@@ -11,6 +11,4 @@ int main()
         printf("%d: Hola!\n", id);
         printf("%d: Adios!\n", id);
     }
-
-    return 0;
 }

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-int main()
+void main()
 {
     int id;
 
@@ -15,6 +15,4 @@ int main()
         id = omp_get_thread_num();
         printf("%d: Adios!\n", id);
     }
-
-    return 0;
 }

@@ -13,8 +13,10 @@ void main ()
     int thread_num = 0;
     int nthreads = omp_get_max_threads();
     double thread_sum[nthreads][8];
-
     memset(thread_sum, 0, sizeof(double) * nthreads);
+
+    //Establecer número de threads dinámicos
+    omp_set_dynamic(1);
     omp_set_num_threads(nthreads);
 
     thread_num_steps = num_steps / nthreads;
@@ -26,6 +28,7 @@ void main ()
         thread_num = omp_get_thread_num();
         step_init = thread_num * thread_num_steps;
         num_steps = step_init + thread_num_steps;
+
         for (i = step_init; i < num_steps; i++) {
             x = (i + 0.5) * step;
             thread_sum[thread_num][0] += 4.0 / (1.0 + x * x);
