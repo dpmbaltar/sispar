@@ -7,7 +7,7 @@ double sample_time()
 {
    struct timespec tv;
    clock_gettime(CLOCK_MONOTONIC_RAW, &tv);
-   return ((double)tv.tv_sec+((double)tv.tv_nsec)/1000000000.0);
+   return ((double)tv.tv_sec + ((double)tv.tv_nsec)/1000000000.0);
 }
 
 int primo(int n)
@@ -31,7 +31,7 @@ void main()
     int nprimes = 0;
 
     from = 2;
-    to = 1000000;
+    to = 200000;
 
     #pragma omp parallel private(t) reduction(+:nprimes)
     {

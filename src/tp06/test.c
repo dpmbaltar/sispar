@@ -15,7 +15,27 @@ double sample_time()
 
 void main()
 {
-    int sum = 0;
+    #pragma omp parallel num_threads (2)
+    {
+        #pragma omp single
+        {
+            #pragma omp task
+            {
+                int thread_num = omp_get_thread_num();
+                printf("hola %d\n", thread_num);
+            }
+            #pragma omp task
+            {
+                int thread_num = omp_get_thread_num();
+                printf("mundo %d\n", thread_num);
+            }
+        }
+        printf("fin\n");
+    }
+
+
+
+    /*int sum = 0;
     int sub = 0;
     int *a = (int*)malloc(sizeof(int) * N);
 
@@ -40,7 +60,7 @@ void main()
     printf("Sum: %d Sub: %d\n", sum, sub);
 
     t = sample_time() - t;
-    printf("Time: %f\n", t);
+    printf("Time: %f\n", t);*/
 
 
 
