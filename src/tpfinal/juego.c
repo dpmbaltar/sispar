@@ -353,5 +353,9 @@ int main(int argc, char **argv)
 
     MPI_Finalize();
 
+    free(old);
+    free(old_buffer);
+    free(new_buffer);
+
     return EXIT_SUCCESS;
 }
