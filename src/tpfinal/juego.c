@@ -3,7 +3,7 @@
  *
  * Grupo:
  * - Baltar, Diego Pablo Matias (FAI-1235)
- * - Muzas, Marcelo Gaston ()
+ * - Muzas, Marcelo Gaston (FAI-538)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,8 +235,12 @@ int main(int argc, char **argv)
         MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], RIGHT, new_comm, &recv_request[LEFT]);
         MPI_Irecv(&outer_cols[1], chunk_rows, MPI_CHAR, next_ranks[RIGHT], LEFT, new_comm, &recv_request[RIGHT]);
 
-        //Recibir cambios de los vecinos y procesar los bordes
-        MPI_Waitall(8, recv_request, recv_status);
+        //Recibir cambios de los vecinos y procesar los bordes necesarios
+        MPI_Wait(&recv_request[TOP_LEFT], &recv_status[TOP_LEFT]);
+        MPI_Wait(&recv_request[TOP_RIGHT], &recv_status[TOP_RIGHT]);
+        MPI_Wait(&recv_request[TOP], &recv_status[TOP]);
+        MPI_Wait(&recv_request[LEFT], &recv_status[LEFT]);
+        MPI_Wait(&recv_request[RIGHT], &recv_status[RIGHT]);
 
         //Procesar esquina superior izquierda
         live_neighbors = corners[0];
@@ -259,6 +263,11 @@ int main(int argc, char **argv)
             live_neighbors+= outer_rows[0][i-1] + outer_rows[0][i] + outer_rows[0][i+1];
             NEXT_STEP(0, i, live_neighbors, old_buffer, new_buffer);
         }
+
+        //Recibir cambios de los vecinos y procesar los bordes necesarios
+        MPI_Wait(&recv_request[BOTTOM_LEFT], &recv_status[BOTTOM_LEFT]);
+        MPI_Wait(&recv_request[BOTTOM_RIGHT], &recv_status[BOTTOM_RIGHT]);
+        MPI_Wait(&recv_request[BOTTOM], &recv_status[BOTTOM]);
 
         //Procesar interior de la columna izquierda
         for (i = 1; i < chunk_rows-1; i++) {
@@ -333,7 +342,7 @@ int main(int argc, char **argv)
         }
 
         //Si hay restos, la salida difiere del programa serie
-        if (rows % dims[ROWS] != 0 || rows % dims[COLS] != 0)
+        if (rows % dims[ROWS] != 0 || cols % dims[COLS] != 0)
             printf("Hay resto de datos para %d filas, %d columnas y %d procesos!\n",
                 rows, cols, size);
     } else { //Enviar los datos finales al proceso raíz
