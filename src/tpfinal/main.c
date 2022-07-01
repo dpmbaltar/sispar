@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 #include <mpi.h>
 
 /**
@@ -12,10 +13,6 @@
         (newbuf)[(i)][(j)] = (((neighbors) == 2 || (neighbors) == 3)) ? 1 : 0; \
     else                                                                       \
         (newbuf)[(i)][(j)] = ((neighbors) == 3) ? 1 : 0;
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 
 /**
  * Calcula la división mas optima de la grilla y retorna la partición
