@@ -13,12 +13,46 @@
     else                                                                       \
         (newbuf)[(i)][(j)] = ((neighbors) == 3) ? 1 : 0;
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+/**
+ * Calcula la división mas optima de la grilla y retorna la partición
+ * encontrada de la siguiente forma:
+ * division[0] = cantidad de procesos por fila
+ * division[1] = cantidad de procesos por columna
+ *
+ * El ultimo proceso de cada fila/columna procesará mas celdas
+ */
+void calcular_division(int rows, int cols, int cantProcesos, int division[])
+{
+  int resultado, i, menor = -1;
+
+  for (i = 1; i <= cantProcesos; i++)
+  {
+    if (cantProcesos % i == 0)
+    {
+      resultado = fabs((rows / i) - (cols / (cantProcesos / i)));
+      if (menor == -1)
+      {
+        menor = resultado;
+      }
+      if (resultado <= menor)
+      {
+        menor = resultado;
+        division[0] = i;
+        division[1] = cantProcesos / i;
+      }
+    }
+  }
+}
+
 int main(int argc, char **argv)
 {
     FILE *f;
     char *s, *res;
-    int rows, cols, steps, n, i, j, ncols, nrows;
-
+    int rows, cols, steps, n, i, j;
     int size, rank, root = 0;
 
     MPI_Init(&argc, &argv);
@@ -52,19 +86,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    //El tamaño total de la matriz es el tamaño indicado más dos filas y dos
-    //columnas auxiliares
-    nrows = rows + 2;
-    ncols = cols + 2;
     //printf("Rows: %d cols: %d\n", rows, cols);
 
     //Se reserva memoria dinámica para la matriz "old"
-    char(*old)[cols] = malloc (sizeof(char[rows][cols]));
+    char(*old)[cols] = malloc(sizeof(char[rows][cols]));
     memset(old, 0, sizeof(char[rows][cols]));
     
     //Inicializa elementos de la matriz "old" con 0 o 1 segun el patron de entrada
     i = 0;
-    s = (char *)malloc(cols + 2);
+    s = (char*)malloc(cols + 2);
     res = fgets(s, cols + 2, f);
 
     while (i < rows && res != NULL) {
@@ -90,7 +120,8 @@ int main(int argc, char **argv)
     int reorder = false;
     MPI_Comm new_comm;
 
-    MPI_Dims_create(size, N_DIMS, dims);
+    calcular_division(rows, cols, size, dims);
+    //MPI_Dims_create(size, N_DIMS, dims);
     MPI_Cart_create(MPI_COMM_WORLD, N_DIMS, dims, periods, reorder, &new_comm);
     //printf("Dimensiones: %d, %d\n", dims[0], dims[1]);
 
@@ -158,23 +189,16 @@ int main(int argc, char **argv)
             MPI_Isend(&old[offset_rows][offset_cols], 1, chunk_type, i, 0, new_comm, &request[i-1]);
         }
 
-        //MPI_Waitall(size-1, request, status);
-
-        /*MPI_Scatter(old, 1, chunk_type,
-                    old_buffer, chunk_length, MPI_CHAR,
-                    root, new_comm);*/
+        MPI_Waitall(size-1, request, status);
     } else { //Recibir datos
-        /*MPI_Scatter(NULL, 1, chunk_type,
-                    old_buffer, chunk_length, MPI_CHAR,
-                    root, new_comm);*/
         MPI_Status status;
         MPI_Request request;
 
         MPI_Irecv(old_buffer, chunk_length, MPI_CHAR, root, 0, new_comm, &request);
         MPI_Wait(&request, &status);
-
     }
 
+    //Mostrar trozo de datos
     /*for (i = 0; i < chunk_rows; i++) {
         for (j = 0; j < chunk_cols; j++)
             printf("%c", old_buffer[i][j] == 0 ? '.' : 'O');
@@ -204,16 +228,16 @@ int main(int argc, char **argv)
     for (current_step = 0; current_step < steps; current_step++) {
 
         //Enviar datos a los procesos vecinos
-        MPI_Isend(&old_buffer[0][0], 1, MPI_CHAR, next_ranks[TOP_LEFT], 0, new_comm, &send_request[TOP_LEFT]);
-        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &send_request[TOP_RIGHT]);
-        MPI_Isend(&old_buffer[chunk_rows-1][0], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &send_request[BOTTOM_LEFT]);
-        MPI_Isend(&old_buffer[chunk_rows-1][chunk_cols-1], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &send_request[BOTTOM_RIGHT]);
-        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &send_request[TOP]);
-        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &send_request[BOTTOM]);
-        MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], 0, new_comm, &send_request[LEFT]);
-        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], 0, new_comm, &send_request[RIGHT]);
+        MPI_Isend(&old_buffer[0][0], 1, MPI_CHAR, next_ranks[TOP_LEFT], TOP_LEFT, new_comm, &send_request[TOP_LEFT]);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], TOP_RIGHT, new_comm, &send_request[TOP_RIGHT]);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], BOTTOM_LEFT, new_comm, &send_request[BOTTOM_LEFT]);
+        MPI_Isend(&old_buffer[chunk_rows-1][chunk_cols-1], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], BOTTOM_RIGHT, new_comm, &send_request[BOTTOM_RIGHT]);
+        MPI_Isend(&old_buffer[0][0], chunk_cols, MPI_CHAR, next_ranks[TOP], TOP, new_comm, &send_request[TOP]);
+        MPI_Isend(&old_buffer[chunk_rows-1][0], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], BOTTOM, new_comm, &send_request[BOTTOM]);
+        MPI_Isend(&old_buffer[0][0], 1, chunk_col_type, next_ranks[LEFT], LEFT, new_comm, &send_request[LEFT]);
+        MPI_Isend(&old_buffer[0][chunk_cols-1], 1, chunk_col_type, next_ranks[RIGHT], RIGHT, new_comm, &send_request[RIGHT]);
 
-        MPI_Waitall(8, send_request, send_status);
+        //MPI_Waitall(8, send_request, send_status);
 
         //Calcular los estados internos
         for (i = 1; i < chunk_rows-1; i++) {
@@ -227,14 +251,14 @@ int main(int argc, char **argv)
         }
 
         //Recibir datos de los procesos vecinos en forma no bloqueante
-        MPI_Irecv(&corners[0], 1, MPI_CHAR, next_ranks[TOP_LEFT], 0, new_comm, &recv_request[TOP_LEFT]);
-        MPI_Irecv(&corners[1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], 0, new_comm, &recv_request[TOP_RIGHT]);
-        MPI_Irecv(&corners[2], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], 0, new_comm, &recv_request[BOTTOM_LEFT]);
-        MPI_Irecv(&corners[3], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], 0, new_comm, &recv_request[BOTTOM_RIGHT]);
-        MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], 0, new_comm, &recv_request[TOP]);
-        MPI_Irecv(&outer_rows[1], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], 0, new_comm, &recv_request[BOTTOM]);
-        MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], 0, new_comm, &recv_request[LEFT]);
-        MPI_Irecv(&outer_cols[1], chunk_rows, MPI_CHAR, next_ranks[RIGHT], 0, new_comm, &recv_request[RIGHT]);
+        MPI_Irecv(&corners[0], 1, MPI_CHAR, next_ranks[TOP_LEFT], BOTTOM_RIGHT, new_comm, &recv_request[TOP_LEFT]);
+        MPI_Irecv(&corners[1], 1, MPI_CHAR, next_ranks[TOP_RIGHT], BOTTOM_LEFT, new_comm, &recv_request[TOP_RIGHT]);
+        MPI_Irecv(&corners[2], 1, MPI_CHAR, next_ranks[BOTTOM_LEFT], TOP_RIGHT, new_comm, &recv_request[BOTTOM_LEFT]);
+        MPI_Irecv(&corners[3], 1, MPI_CHAR, next_ranks[BOTTOM_RIGHT], TOP_LEFT, new_comm, &recv_request[BOTTOM_RIGHT]);
+        MPI_Irecv(&outer_rows[0], chunk_cols, MPI_CHAR, next_ranks[TOP], BOTTOM, new_comm, &recv_request[TOP]);
+        MPI_Irecv(&outer_rows[1], chunk_cols, MPI_CHAR, next_ranks[BOTTOM], TOP, new_comm, &recv_request[BOTTOM]);
+        MPI_Irecv(&outer_cols[0], chunk_rows, MPI_CHAR, next_ranks[LEFT], RIGHT, new_comm, &recv_request[LEFT]);
+        MPI_Irecv(&outer_cols[1], chunk_rows, MPI_CHAR, next_ranks[RIGHT], LEFT, new_comm, &recv_request[RIGHT]);
 
         //Recibir cambios de los vecinos y procesar los bordes
         MPI_Waitall(8, recv_request, recv_status);
@@ -299,6 +323,8 @@ int main(int argc, char **argv)
             NEXT_STEP(chunk_rows-1, i, live_neighbors, old_buffer, new_buffer);
         }
 
+        MPI_Waitall(8, send_request, send_status);
+
         //Intercambio de punteros, para realizar el siguiente paso con los
         //nuevos estados calculados
         aux_buffer = old_buffer;
@@ -330,7 +356,7 @@ int main(int argc, char **argv)
             MPI_Wait(&end_recv_request, &end_recv_status);
         }
 
-        printf("Resultado:\n");
+        printf("Salida:\n");
         printf("cols %d \nrows %d \nsteps %d \n", cols, rows, steps);
         for (i = 0; i < rows; i++) {
             for (j = 0; j < cols; j++) {
