@@ -1,3 +1,6 @@
+/**
+ * TP Final de Sistemas Paralelos 2022
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -45,6 +48,9 @@ void calcular_division(int rows, int cols, int cantProcesos, int division[])
   }
 }
 
+/**
+ * Programa principal del enunciado.
+ */
 int main(int argc, char **argv)
 {
     FILE *f;
@@ -361,6 +367,11 @@ int main(int argc, char **argv)
             }
             printf("\n");
         }
+
+        //Si hay restos, la salida difiere del programa serie
+        if (rows % dims[ROWS] != 0 || rows % dims[COLS] != 0)
+            printf("Hay resto de datos para %d filas, %d columnas y %d procesos!\n",
+                rows, cols, size);
     } else { //Enviar los datos finales al proceso raíz
         MPI_Request end_send_request;
         MPI_Isend(old_buffer, chunk_length, MPI_CHAR, root, 0, new_comm, &end_send_request);
